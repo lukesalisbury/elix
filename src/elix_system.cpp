@@ -9,8 +9,12 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 ****************************/
 
+#include "elix_directory.cpp"
 #include "elix_endian.cpp"
+#include "elix_file.cpp"
 #include "elix_string.cpp"
 #include "elix_path.cpp"
-#include "elix_file.cpp"
+#include "elix_png.cpp"
+#include "elix_program.cpp"
+
 

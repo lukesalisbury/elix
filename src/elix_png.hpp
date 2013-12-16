@@ -2,7 +2,7 @@
 #define _ELIX_PNG_H_
 
 #include "elix_intdef.h"
-#include "elix_file.h"
+#include "elix_file.hpp"
 
 namespace elix
 {

@@ -17,8 +17,8 @@ Permission is granted to anyone to use this software for any purpose, including 
 #include <iostream>
 #include <sstream>
 #include <cstring>
-#include "elix_endian.h"
-#include "elix_file.h"
+#include "elix_endian.hpp"
+#include "elix_file.hpp"
 
 namespace elix {
 	File::File(std::string filename, bool write)
@@ -89,6 +89,57 @@ namespace elix {
 			}
 		}
 		return true;
+	}
+
+	int32_t File::Scan( int32_t startPostion, uint8_t * needle, uint32_t needleLength )
+	{
+		int32_t position = -1;
+		bool needle_found = false;
+		if ( this->handle && needleLength > 0 )
+		{
+
+			int32_t c = 0;
+			uint8_t check = 0;
+
+			this->Seek( startPostion );
+			do {
+				c = fgetc( (FILE *)this->handle );
+				check = c;
+
+				if ( check == needle[0] )
+				{
+					uint32_t scan_count = 1;
+
+					position = this->Tell()-1; //want to go back to the first character
+
+					while ( scan_count < needleLength )
+					{
+						c = fgetc( (FILE *)this->handle );
+						check = c;
+
+						if ( check != needle[scan_count] )
+						{
+							position = -1;
+							scan_count = needleLength;
+						}
+						scan_count++;
+					}
+
+					if ( position > 0 )
+					{
+						 needle_found = true;
+					}
+
+
+				}
+
+
+			} while ( !EndOfFile() && !needle_found );
+
+		}
+
+		this->Seek( 0 );
+		return position;
 	}
 
 	bool File::Read( data_pointer buffer, uint32_t size, uint32_t count )

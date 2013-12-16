@@ -15,10 +15,19 @@ Permission is granted to anyone to use this software for any purpose, including 
 #include <iostream>
 #include <sstream>
 #include <cstring>
-#include "elix_string.h"
+#include "elix_string.hpp"
 
 namespace elix {
 	namespace string {
+		void StripUnwantedCharacters( std::string & str )
+		{
+			size_t pos;
+			while( str.length() && str.at(0) == '.' ) // Don't start with a .
+				str.erase( 0, 1 );
+			while( (pos = str.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-.")) != std::string::npos )
+				str.erase( pos, 1 );
+		}
+
 		void Replace( std::string & str, std::string find, std::string replace )
 		{
 			std::string::size_type look = 0;

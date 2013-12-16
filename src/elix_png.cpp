@@ -17,8 +17,8 @@ Permission is granted to anyone to use this software for any purpose, including 
 #define STBI_NO_HDR 1
 
 #include <iostream>
-#include "elix_png.h"
-#include "elix_file.h"
+#include "elix_png.hpp"
+#include "elix_file.hpp"
 #include "stb_image.c"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION 1

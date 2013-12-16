@@ -14,7 +14,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 #include <map>
 #include <iostream>
 #include <iostream>
-#include "elix_string.h"
+#include "elix_string.hpp"
 
 #ifdef __GNUWIN32__
 	#include <winsock.h>

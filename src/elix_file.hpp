@@ -3,7 +3,7 @@
 
 #include <cstdio>
 #include <fstream>
-#include "elix_path.h"
+#include "elix_path.hpp"
 #include "elix_intdef.h"
 
 typedef FILE* file_pointer;
@@ -30,6 +30,7 @@ namespace elix {
 			uint32_t Length();
 			int32_t Seek( int32_t pos );
 			int32_t Tell();
+			int32_t Scan( int32_t startPostion, uint8_t * needle, uint32_t needleLength );
 			bool EndOfFile();
 			bool Read( data_pointer buffer, uint32_t size, uint32_t count );
 			uint32_t Read2( data_pointer buffer, uint32_t size, uint32_t count );
