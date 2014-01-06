@@ -117,13 +117,13 @@ namespace elix {
 				full_directory += subname;
 				full_directory.append(1, ELIX_DIR_SEPARATOR);
 			}
-			Create( full_directory );
+			elix::path::Create( full_directory );
 			return full_directory;
 		}
 
 		std::string Documents( bool shared )
 		{
-			return User(document_name);
+			return User(elix::program::document_name);
 		}
 
 		std::string Cache(  )
@@ -142,7 +142,7 @@ namespace elix {
 		{
 			std::string full_directory = User("share");
 
-			full_directory.append( _user );
+			full_directory.append( elix::program::_user );
 
 			elix::path::Create( full_directory );
 			if ( elix::path::Exist( full_directory ) )
@@ -237,7 +237,7 @@ namespace elix {
 				if ( !home_path )
 				{
 					full_directory.assign("/usr/share");
-					full_directory.append(document_name);
+					full_directory.append(elix::program::document_name);
 				}
 				else
 				{
@@ -252,8 +252,8 @@ namespace elix {
 						for( uint32_t i = 0; i < results.size(); i++ )
 						{
 							path = results.at(i);
-							path.append(document_name);
-							if ( Exist(path) )
+							path.append(elix::program::document_name);
+							if ( elix::path::Exist(path) )
 							{
 								full_directory.assign(path);
 								valid = true;
@@ -285,7 +285,7 @@ namespace elix {
 				{
 					full_directory.assign(home_path);
 				}
-				full_directory.append(document_name);
+				full_directory.append(elix::program::document_name);
 			}
 		#endif
 
@@ -323,7 +323,7 @@ namespace elix {
 			{
 				full_directory.assign(home_path);
 			}
-			full_directory.append(_user);
+			full_directory.append(elix::program::_user);
 		#endif
 
 			elix::path::Create( full_directory );
