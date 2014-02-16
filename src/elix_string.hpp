@@ -14,6 +14,9 @@ namespace elix {
 		void Trim( std::string * source );
 		void Truncate(std::string & source , size_t requested_length);
 
+		bool HasPrefix( const std::string source, const std::string prefix );
+		bool HasSuffix( const std::string source, const std::string suffix );
+
 		uint32_t Hash( std::string str );
 
 		std::string FromInt(int32_t value);

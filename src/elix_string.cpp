@@ -121,6 +121,33 @@ namespace elix {
 			stream >> value;
 			return (uint8_t)value;
 		}
+
+		bool HasPrefix( const std::string source, const std::string prefix )
+		{
+			std::string::size_type look = 0;
+			std::string::size_type found;
+
+			if ((found = source.find(prefix, 0)) != std::string::npos)
+			{
+				if ( found == 0)
+					return true;
+			}
+			return false;
+		}
+
+		bool HasSuffix( const std::string source, const std::string suffix )
+		{
+			std::string::size_type look = 0;
+			std::string::size_type found;
+			std::string::size_type offset = source.length() - suffix.length();
+
+			if ((found = source.rfind(suffix, std::string::npos)) != std::string::npos)
+			{
+				if ( found == offset )
+					return true;
+			}
+			return false;
+		}
 	}
 }
 
