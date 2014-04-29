@@ -787,12 +787,13 @@ static int get16le(stbi *s)
    return z + (get8(s) << 8);
 }
 
+/*
 static uint32 get32le(stbi *s)
 {
    uint32 z = get16le(s);
    return z + (get16le(s) << 16);
 }
-
+*/
 //////////////////////////////////////////////////////////////////////////////
 //
 //  generic converter from built-in img_n to req_comp
