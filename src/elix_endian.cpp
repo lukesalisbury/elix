@@ -30,7 +30,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 #elif defined (__GAMECUBE__) || defined (__WII__)
 	#include <network.h>
 	#define ENDIAN_NETWORK 1
-#if defined __apple__
+#elif defined __apple__
 	#include <SDL.h>
 	#define ENDIAN_SDL 1
 #else
