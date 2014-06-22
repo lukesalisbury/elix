@@ -76,6 +76,41 @@ namespace elix {
 			}
 		}
 
+		void TruncateLines( std::string & source, size_t requested_length )
+		{
+			//
+			std::string::size_type line_break = 0;
+			std::string::size_type line_start = 0;
+			std::string::size_type line_length = 0;
+			std::string::size_type remove_char_count = 0;
+			std::string::size_type center_char = requested_length/2;
+
+			line_break = source.find_first_of("\n", line_start);
+
+			if ( std::string::npos == line_break )
+			{
+				Truncate( source, requested_length );
+			}
+			else
+			{
+				while ( std::string::npos != line_break )
+				{
+					line_length = line_break - line_start;
+					remove_char_count = line_length - requested_length;
+
+					if ( line_length > requested_length )
+					{
+						source.replace( center_char, remove_char_count, "..." ); // …
+
+					}
+
+					line_start = line_break;
+
+					line_break = source.find_first_of("\n", line_start+1);
+				}
+			}
+		}
+
 		uint32_t Hash( std::string str )
 		{
 			uint32_t hash = 0;

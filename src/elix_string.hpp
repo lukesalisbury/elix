@@ -13,6 +13,7 @@ namespace elix {
 		void Split( std::string str, std::string delim, std::vector<std::string> * results );
 		void Trim( std::string * source );
 		void Truncate(std::string & source , size_t requested_length);
+		void TruncateLines( std::string & source, size_t requested_length );
 
 		bool HasPrefix( const std::string source, const std::string prefix );
 		bool HasSuffix( const std::string source, const std::string suffix );
