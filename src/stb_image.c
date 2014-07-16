@@ -780,14 +780,14 @@ static uint32 get32(stbi *s)
    uint32 z = get16(s);
    return (z << 16) + get16(s);
 }
-
+/*
 static int get16le(stbi *s)
 {
    int z = get8(s);
    return z + (get8(s) << 8);
 }
 
-/*
+
 static uint32 get32le(stbi *s)
 {
    uint32 z = get16le(s);

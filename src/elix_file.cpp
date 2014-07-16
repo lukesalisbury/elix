@@ -1,5 +1,5 @@
 /****************************
-Copyright © 2006-2012 Luke Salisbury
+Copyright © 2006-2014 Luke Salisbury
 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
 
 Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -217,7 +217,7 @@ namespace elix {
 		return 0;
 	}
 
-	uint32_t File::Read_uint32( bool sysvalue )
+	uint32_t File::ReadUint32( bool sysvalue )
 	{
 		uint32_t value = 0;
 		uint32_t read = fread(&value, sizeof(uint32_t), 1, (FILE *)this->handle);
@@ -235,7 +235,7 @@ namespace elix {
 		return value;
 	}
 
-	uint16_t File::Read_uint16( bool sysvalue )
+	uint16_t File::ReadUint16( bool sysvalue )
 	{
 		uint16_t value = 0;
 		if ( !fread(&value, sizeof(uint16_t), 1, (FILE *)this->handle) )
@@ -252,7 +252,7 @@ namespace elix {
 		return value;
 	}
 
-	uint8_t File::Read_uint8( )
+	uint8_t File::ReadUint8( )
 	{
 		uint8_t value = 0;
 
@@ -289,7 +289,7 @@ namespace elix {
 		uint32_t character_count = 0;
 		while ( value )
 		{
-			value = this->Read_uint8( );
+			value = this->ReadUint8( );
 			character_count++;
 			if ( value && !this->EndOfFile() )
 			{
@@ -488,9 +488,9 @@ namespace elix {
 		return result;
 	}
 
-	uint32_t File::Read_uint32WithLabel( std::string label, bool sysvalue )
+	uint32_t File::ReadUint32WithLabel( std::string label, bool sysvalue )
 	{
-		uint32_t result = Read_uint32( sysvalue );
+		uint32_t result = ReadUint32( sysvalue );
 	#ifdef DEBUG
 		if ( !this->read_log_handle.is_open() )
 			this->read_log_handle.open("read.log",  std::fstream::out );
@@ -498,9 +498,9 @@ namespace elix {
 	#endif
 		return result;
 	}
-	uint16_t File::Read_uint16WithLabel( std::string label, bool sysvalue )
+	uint16_t File::ReadUint16WithLabel( std::string label, bool sysvalue )
 	{
-		uint16_t result = Read_uint16( sysvalue );
+		uint16_t result = ReadUint16( sysvalue );
 	#ifdef DEBUG
 		if ( !this->read_log_handle.is_open() )
 			this->read_log_handle.open("read.log",  std::fstream::out );
@@ -508,9 +508,9 @@ namespace elix {
 	#endif
 		return result;
 	}
-	uint8_t File::Read_uint8WithLabel( std::string label )
+	uint8_t File::ReadUint8WithLabel( std::string label )
 	{
-		uint8_t result = Read_uint8(  );
+		uint8_t result = ReadUint8(  );
 	#ifdef DEBUG
 		if ( !this->read_log_handle.is_open() )
 			this->read_log_handle.open("read.log",  std::fstream::out );

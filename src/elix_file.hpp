@@ -35,9 +35,9 @@ namespace elix {
 			bool Read( data_pointer buffer, uint32_t size, uint32_t count );
 			uint32_t Read2( data_pointer buffer, uint32_t size, uint32_t count );
 			uint32_t ReadAll( data_pointer * buffer, bool addnull = false );
-			uint32_t Read_uint32( bool sysvalue = false );
-			uint16_t Read_uint16( bool sysvalue = false );
-			uint8_t Read_uint8( );
+			uint32_t ReadUint32( bool sysvalue = false );
+			uint16_t ReadUint16( bool sysvalue = false );
+			uint8_t ReadUint8( );
 			std::string ReadString();
 			bool Read(  std::string * str, uint32_t length = 0 );
 			bool ReadLine( std::string * str );
@@ -60,9 +60,9 @@ namespace elix {
 
 			bool ReadWithLabel( std::string label, data_pointer buffer, uint32_t size, uint32_t count );
 			uint32_t Read2WithLabel( std::string label, data_pointer buffer, uint32_t size, uint32_t count );
-			uint32_t Read_uint32WithLabel( std::string label, bool sysvalue = false );
-			uint16_t Read_uint16WithLabel( std::string label, bool sysvalue = false );
-			uint8_t Read_uint8WithLabel( std::string label );
+			uint32_t ReadUint32WithLabel( std::string label, bool sysvalue = false );
+			uint16_t ReadUint16WithLabel( std::string label, bool sysvalue = false );
+			uint8_t ReadUint8WithLabel( std::string label );
 			std::string ReadStringWithLabel( std::string label );
 			bool ReadWithLabel( std::string label, std::string * str, uint32_t length = 0 );
 
