@@ -27,7 +27,7 @@ namespace elix
 			~Image();
 			bool LoadFile( File *png_file );
 			bool LoadFile( uint8_t * data, int32_t size );
-			void SaveFile( char * filename );
+			void SaveFile( const char * filename );
 			uint16_t GetPixel16( int32_t x, int32_t y );
 			uint32_t GetPixel( int32_t x, int32_t y );
 			bool GetPixel( int32_t x, int32_t y, uint8_t &r, uint8_t &g, uint8_t &b, uint8_t &a );
@@ -41,6 +41,19 @@ namespace elix
 
 
 			uint8_t * GetPixels() { return pixels; }
+			bool SetPixels( int32_t w, int32_t h, uint8_t * data )
+			{
+				this->width = w;
+				this->height = h;
+
+				this->pixels = data;
+				this->bpp = 4;
+
+
+
+				return true;
+			}
+
 
 
 			void ConvertTo16BPP();

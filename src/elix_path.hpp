@@ -25,20 +25,16 @@ namespace elix {
 
 	namespace directory {
 		/* Returns Private or Public Document Folder */
-		std::string Documents( bool shared );
-		std::string Documents( bool shared, std::string filename );
+		std::string Documents( bool shared, std::string filename = "" );
 
 		/* Returns User Data directory with subfolder. XDG_DATA_HOME/ProgramName-ProgramVersion/subdir or CSIDL_Local_APPDATA/ProgramName-ProgramVersion/subdir */
-		std::string User( std::string subdirectory, bool roaming = false );
-		std::string User( std::string subdirectory, std::string filename, bool roaming = false );
+		std::string User( std::string subdirectory, bool roaming = false, std::string filename = "" );
 
-		/* Returns User Cache directory with file . XDG_CACHE_HOME/ProgramName/filename or CSIDL_APPDATA/ProgramName/cache/filename */
-		std::string Cache( );
+		/* Returns User Cache directory with file. XDG_CACHE_HOME/ProgramName/filename or CSIDL_APPDATA/ProgramName/cache/filename */
 		std::string Cache( std::string filename );
 
 		/* Returns Program Resources directory with subdirectory. binary_dir/../share/ProgramName-ProgramVersion/subdir */
-		std::string Resources( std::string subdirectory );
-		std::string Resources( std::string subdirectory, std::string filename );
+		std::string Resources( std::string subdirectory, std::string filename = "" );
 
 
 	}

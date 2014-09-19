@@ -119,7 +119,7 @@ namespace elix {
 			std::cout << "User: " << elix::directory::User("") << std::endl;
 			std::cout << "User Documents: " << elix::directory::Documents(false) << std::endl;
 			std::cout << "Global Documents: " << elix::directory::Documents(true) << std::endl;
-			std::cout << "Cache: " << elix::directory::Cache() << std::endl;
+			std::cout << "Cache: " << elix::directory::Cache("") << std::endl;
 			std::cout << "Resources: " << elix::directory::Resources("") << std::endl;
 		}
 

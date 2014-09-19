@@ -87,7 +87,7 @@ namespace elix {
 	}
 
 
-	void Image::SaveFile( char * filename )
+	void Image::SaveFile(const char *filename )
 	{
 		stbi_write_png(filename, this->width, this->height, 4, this->pixels, this->width * this->bpp);
 	}

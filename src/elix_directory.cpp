@@ -39,137 +39,138 @@ Permission is granted to anyone to use this software for any purpose, including 
 
 
 namespace elix {
+	namespace directory {
+		inline void AppendDirectory( std::string & path, std::string subdirectory )
+		{
+			elix::string::StripUnwantedCharacters( subdirectory );
+			if ( subdirectory.length() )
+			{
+				path.append( 1, ELIX_DIR_SEPARATOR );
+				path.append( subdirectory );
 
+			}
+		}
+		inline void AppendFileName( std::string & path, std::string filename )
+		{
+			elix::string::StripUnwantedCharacters( filename );
+			if ( filename.length() )
+			{
+				path.append( 1, ELIX_DIR_SEPARATOR );
+				path.append( filename );
+			}
+		}
+
+	}
 	/* User's Directory Functions */
 	#if defined(DREAMCAST) || defined(__NDS__) || defined(GEKKO) || defined(FLASCC)
 	namespace directory {
-		std::string User( std::string subname, bool roaming )
+
+		std::string User( std::string subdirectory, bool roaming, std::string filename )
 		{
 			#if defined (DREAMCAST)
 			std::string full_directory = "/sd/";
 			#else
 			std::string full_directory = "/";
 			#endif
-			elix::string::StripUnwantedCharacters( subname );
 
-			if ( subname.length() )
-			{
-				full_directory += subname;
-				full_directory.append(1, ELIX_DIR_SEPARATOR);
-			}
+			AppendDirectory( full_directory, subdirectory );
+			AppendFileName( full_directory, filename );
 
 			return full_directory;
 		}
 
-		std::string Documents( bool shared )
-		{
-			#if defined (DREAMCAST)
-				return "/";
-			#else
-				return User(document_name);
-			#endif
-
-		}
-
-		std::string Cache(std::string filename )
+		std::string Documents( bool shared, std::string filename )
 		{
 		#if defined (DREAMCAST)
-			return "/sd/cache/" + filename;
+			std::string full_directory = "/";
 		#else
-			return "/cache/" + filename ;
+			std::string full_directory = "/";
 		#endif
+			AppendFileName( full_directory, filename );
+			return full_directory;
+		}
+		std::string Cache( std::string filename )
+		{
+		#if defined (DREAMCAST)
+			std::string full_directory = "/sd/cache/";
+		#else
+			std::string full_directory = "/cache/";
+		#endif
+			AppendFileName( full_directory, filename );
+			return full_directory;
 		}
 
-		std::string Resources( std::string subdir )
+		std::string Resources( std::string subdirectory, std::string filename )
 		{
-			#if !defined (DREAMCAST)
-			return User(subdir);
-			#endif
+		#if defined (DREAMCAST)
 			std::string full_directory = "/cd/";
-
-			elix::string::StripUnwantedCharacters( subdir );
-			if ( subdir.length() )
-			{
-				full_directory += subdir;
-				full_directory.append(1, ELIX_DIR_SEPARATOR);
-			}
-
+		#else
+			std::string full_directory = "/";
+		#endif
+			AppendDirectory( full_directory, subdirectory );
+			AppendFileName( full_directory, filename );
 			return full_directory;
 
 		}
 	}
 	#elif defined(ANDROID_NDK)
-
-	// Android
 	namespace directory {
-		std::string User( std::string subname, bool roaming )
+		std::string User( std::string subdirectory, bool roaming, std::string filename )
 		{
-			ANativeActivity * activity = (ANativeActivity*)SDL_AndroidGetActivity();
-
 			std::string full_directory;
+
+			ANativeActivity * activity = (ANativeActivity*)SDL_AndroidGetActivity();
 
 			full_directory = SDL_AndroidGetExternalStoragePath();
 			full_directory.append(1, ELIX_DIR_SEPARATOR);
 
-			elix::string::StripUnwantedCharacters( subname );
+			AppendDirectory( full_directory, subdirectory );
 
-			if ( subname.length() )
-			{
-				full_directory += subname;
-				full_directory.append(1, ELIX_DIR_SEPARATOR);
-			}
 			elix::path::Create( full_directory );
+
+			AppendFileName( full_directory, filename );
+
 			return full_directory;
 		}
 
-		std::string Documents( bool shared )
+		std::string Documents( bool shared, std::string filename )
 		{
-			return User(elix::program::document_name);
-		}
-
-		std::string Cache(  )
-		{
-			elix::path::Create( User(".cache") );
-			return User(".cache");
+			return User(elix::program::document_name, false, filename);
 		}
 
 		std::string Cache( std::string filename )
 		{
-			elix::string::StripUnwantedCharacters( filename );
-			return Cache() + filename ;
+			return User( ".cache", false, filename);
 		}
 
-		std::string Resources( std::string subdir )
+		std::string Resources( std::string subdirectory, std::string filename )
 		{
-			std::string full_directory = User("share");
+			std::string full_directory = User("share", "");
 
-			full_directory.append( elix::program::_user );
-
+			AppendDirectory( full_directory, elix::program::_user );
 			elix::path::Create( full_directory );
-			if ( elix::path::Exist( full_directory ) )
-			{
-				elix::string::StripUnwantedCharacters( subdir );
-				if ( subdir.length() )
-				{
-					full_directory += subdir;
-				}
-			}
+
+			AppendDirectory( full_directory, subdirectory );
+			elix::path::Create( full_directory );
+
+			AppendFileName( full_directory, filename );
+
 			return full_directory;
 
 
 		}
 	}
 	#else
-	// PC
+
 	namespace directory {
-		std::string User( std::string subdir, bool roaming )
+		std::string User( std::string subdirectory, bool roaming, std::string filename )
 		{
 			std::string full_directory = "./";
-			bool valid = true;
 
 		#if defined(__WINDOWS__) || defined(__GNUWIN32__)
+			bool valid = true;
 			char directory[MAX_PATH];
-			valid = SHGetSpecialFolderPath(NULL, directory, (roaming ? CSIDL_APPDATA : CSIDL_LOCAL_APPDATA), 0);
+			valid = SHGetSpecialFolderPath(NULL, directory, (roaming ? CSIDL_APPDATA : CSIDL_LOCAL_APPDATA), 1);
 			if ( valid )
 				full_directory = directory;
 		#else
@@ -196,25 +197,21 @@ namespace elix {
 			}
 
 		#endif
-			/* Make sure the directory exist */
-			full_directory.append(elix::program::_user);
+
+			AppendDirectory( full_directory, elix::program::_user );
 			elix::path::Create( full_directory );
 
-			if ( valid )
-			{
-				elix::string::StripUnwantedCharacters( subdir );
-				if ( subdir.length() )
-				{
-					full_directory += subdir;
-					full_directory.append(1, ELIX_DIR_SEPARATOR);
-				}
-				elix::path::Create( full_directory );
-			}
+			AppendDirectory( full_directory, subdirectory );
+			elix::path::Create( full_directory );
+
+			AppendFileName( full_directory, filename );
+
 
 			return full_directory;
 		}
 
-		std::string Documents( bool shared )
+
+		std::string Documents( bool shared, std::string filename )
 		{
 			/* If not set with SetProgramName, return user directory */
 			if ( !elix::program::document_name.length() )
@@ -230,14 +227,14 @@ namespace elix {
 			valid = SHGetSpecialFolderPath(NULL, directory, (shared ? CSIDL_COMMON_DOCUMENTS : CSIDL_PROFILE), 0);
 			if ( valid )
 				full_directory.assign(directory);
-			full_directory.append(elix::program::document_name);
+			AppendDirectory( full_directory, elix::program::document_name );
 		#else
 			if ( shared )
 			{
 				char * home_path = getenv( "XDG_DATA_DIRS" );
 				if ( !home_path )
 				{
-					full_directory.assign("/usr/share");
+					full_directory.assign("/usr/share/");
 					full_directory.append(elix::program::document_name);
 				}
 				else
@@ -289,71 +286,57 @@ namespace elix {
 				full_directory.append(elix::program::document_name);
 			}
 		#endif
+			elix::path::Create( full_directory );
 
+			AppendFileName( full_directory, filename );
 
-			if ( valid )
-				return full_directory;
-			else
-				return "/";
+			return full_directory;
 		}
 
-		std::string Cache( )
+		std::string Cache( std::string filename )
 		{
-			std::string full_directory;
 		#if defined (__GNUWIN32__)
-			full_directory = elix::directory::User( "cache", true );
+			 return elix::directory::User( "cache", true, filename );
 		#else
+			std::string full_directory;
 			char * home_path = NULL;
 			home_path = getenv( "XDG_CACHE_HOME" );
 			if ( !home_path )
 			{
 				home_path = getenv( "HOME" );
-				if (home_path)
+				if ( home_path )
 				{
 					full_directory.assign(home_path);
 					full_directory.append("/.ElixCache/");
-					mkdir(full_directory.c_str(), 0744);
+					elix::path::Create( full_directory );
 				}
 				else
 				{
 					full_directory.assign("./.ElixCache/");
-					mkdir(full_directory.c_str(), 0744);
 				}
+				elix::path::Create( full_directory );
 			}
 			else
 			{
-				full_directory.assign(home_path);
+				full_directory.assign( home_path );
 			}
-			full_directory.append(elix::program::_user);
-		#endif
-
+			AppendDirectory( full_directory, elix::program::_user );
 			elix::path::Create( full_directory );
 
+			AppendFileName( full_directory, filename );
+
 			return full_directory;
+		#endif
+
+
 		}
 
-
-		std::string Cache( std::string filename )
-		{
-			std::string full_directory = Cache();
-
-			elix::string::StripUnwantedCharacters( filename );
-			if ( filename.length() )
-			{
-				full_directory += filename;
-			}
-			else
-			{
-				full_directory += "temp";
-			}
-			return full_directory;
-		}
-
-		std::string Resources( std::string subdir )
+		std::string Resources( std::string subdirectory, std::string filename )
 		{
 			std::string full_directory = "./";
-			std::string share_directory = elix::program::RootDirectory() + ELIX_DIR_SSEPARATOR"share"ELIX_DIR_SSEPARATOR;
+			std::string share_directory = elix::program::RootDirectory();
 
+			AppendDirectory( share_directory, "share" );
 
 			if ( elix::path::Exist( share_directory ) )
 			{
@@ -362,30 +345,33 @@ namespace elix {
 			else
 			{
 				share_directory = elix::program::RootDirectory();
+
 				/* Takes into account the the binaries are stored in bin subdirectory */
 				size_t pos = share_directory.find_last_of(ELIX_DIR_SEPARATOR);
 				if ( pos > 1 )
 					full_directory = share_directory.substr(0, pos);
 				else
 					full_directory = "..";
-				full_directory.append( 1, ELIX_DIR_SEPARATOR);
-				full_directory.append( "share" );
-			}
-			full_directory.append( elix::program::_user );
 
-			elix::path::Create( full_directory );
-			if ( elix::path::Exist( full_directory ) )
-			{
-				elix::string::StripUnwantedCharacters( subdir );
-				if ( subdir.length() )
-				{
-					full_directory += subdir;
-				}
+				AppendDirectory( full_directory, "share" );
 			}
+
+			AppendDirectory( full_directory, elix::program::_user );
+			elix::path::Create( full_directory );
+
+			AppendDirectory( full_directory, subdirectory );
+			elix::path::Create( full_directory );
+
+			AppendFileName( full_directory, filename );
+
 			return full_directory;
 		}
 	}
 	#endif
+
+
+
+
 
 }
 

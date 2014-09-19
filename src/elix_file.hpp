@@ -27,6 +27,7 @@ namespace elix {
 		public:
 			void (*ErrorCallback)(std::string);
 			bool Exist();
+			std::string GetError() { return this->error; }
 			uint32_t Length();
 			int32_t Seek( int32_t pos );
 			int32_t Tell();
