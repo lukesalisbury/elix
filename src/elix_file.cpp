@@ -1,5 +1,5 @@
 /****************************
-Copyright © 2006-2014 Luke Salisbury
+Copyright © 2006-2015 Luke Salisbury
 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
 
 Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -144,13 +144,8 @@ namespace elix {
 
 	bool File::Read( data_pointer buffer, uint32_t size, uint32_t count )
 	{
-		if ( !Exist() )
+		if ( !Exist() || !buffer )
 			return false;
-
-		if ( !buffer )
-		{
-			buffer = new char[size*count];
-		}
 
 		if ( (count * size) > this->_length )
 		{
@@ -179,12 +174,13 @@ namespace elix {
 		{
 			return 0;
 		}
-		if ( !buffer )
+		if ( buffer )
 		{
-			buffer = new char[size*count];
+
+			uint32_t read = fread(buffer, size, count, (FILE *)this->handle);
+			return read;
 		}
-		uint32_t read = fread(buffer, size, count, (FILE *)this->handle);
-		return read;
+		return 0;
 	}
 
 	uint32_t File::ReadAll( data_pointer * buffer, bool addnull )
@@ -326,6 +322,32 @@ namespace elix {
 		return (bool)str->length();
 	}
 
+	bool File::ReadStruct(data_pointer buffer, uint8_t size)
+	{
+		if ( !this->handle || this->EndOfFile() || !this->_length || !buffer )
+		{
+			return 0;
+		}
+
+		uint8_t data_size = 0;
+
+		if ( fread( &data_size, sizeof(uint8_t), 1, (FILE *)this->handle ) )
+		{
+			if ( data_size == size )
+			{
+				fread(buffer, size, 1, (FILE *)this->handle);
+				return true;
+			}
+			else
+			{
+				if ( this->ErrorCallback )
+					this->ErrorCallback( "ReadStruct data_size != size" );
+			}
+		}
+
+		return false;
+	}
+
 	bool File::Write( data_pointer buffer, uint32_t size, uint32_t count )
 	{
 		if ( !Exist() )
@@ -393,6 +415,14 @@ namespace elix {
 			result = ( fwrite( value.c_str(), sizeof(uint8_t), value.length(), (FILE *)this->handle ) ? true : false );
 		}
 		return result;
+	}
+
+	bool File::WriteStruct(data_pointer buffer, uint8_t size)
+	{
+		if ( !Exist() )
+			return false;
+		fwrite( &size, sizeof(uint8_t), 1, (FILE *)this->handle );
+		return (fwrite( buffer, size, 1, (FILE *)this->handle ) ? true : false);
 	}
 
 
@@ -466,6 +496,17 @@ namespace elix {
 		return false;
 	}
 
+	bool File::WriteStructWithLabel(std::string label, data_pointer buffer, uint8_t size)
+	{
+		bool result = WriteStruct( buffer, size );
+	#ifdef DEBUG
+		if ( !this->read_log_handle.is_open() )
+			this->read_log_handle.open("write.log",  std::fstream::out );
+		this->read_log_handle  << "<" << label << "> " << "Data Size " << ( size ) << std::endl;
+	#endif
+		return result;
+	}
+
 	bool File::ReadWithLabel( std::string label, data_pointer buffer, uint32_t size, uint32_t count )
 	{
 		bool result = Read( buffer, size, count );
@@ -537,6 +578,17 @@ namespace elix {
 		if ( !this->read_log_handle.is_open() )
 			this->read_log_handle.open("read.log",  std::fstream::out );
 		this->read_log_handle << "<" << label << "> '" << *str << "'" << std::endl;
+	#endif
+		return result;
+	}
+
+	bool File::ReadStructWithLabel(std::string label, data_pointer buffer, uint8_t size)
+	{
+		bool result = ReadStruct( buffer, size );
+	#ifdef DEBUG
+		if ( !this->read_log_handle.is_open() )
+			this->read_log_handle.open("read.log",  std::fstream::out );
+		this->read_log_handle << "<" << label << "> '" << size << "'" << std::endl;
 	#endif
 		return result;
 	}

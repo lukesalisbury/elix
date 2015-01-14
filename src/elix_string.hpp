@@ -21,6 +21,10 @@ namespace elix {
 		uint32_t Hash( std::string str );
 
 		std::string FromInt(int32_t value);
+		std::string FromInt64(int64_t value);
+		std::string HexFromInt64(int64_t value);
+		std::string HexFromInt32(int32_t value);
+
 		int32_t ToInt32(std::string string);
 		uint16_t ToIntU16(std::string string);
 		uint8_t ToIntU8(std::string string);

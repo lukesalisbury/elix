@@ -1,5 +1,5 @@
 /****************************
-Copyright © 2006-2014 Luke Salisbury
+Copyright © 2006-2015 Luke Salisbury
 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
 
 Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -64,7 +64,6 @@ namespace elix {
 	/* User's Directory Functions */
 	#if defined(DREAMCAST) || defined(__NDS__) || defined(GEKKO) || defined(FLASCC)
 	namespace directory {
-
 		std::string User( std::string subdirectory, bool roaming, std::string filename )
 		{
 			#if defined (DREAMCAST)
@@ -81,11 +80,7 @@ namespace elix {
 
 		std::string Documents( bool shared, std::string filename )
 		{
-		#if defined (DREAMCAST)
 			std::string full_directory = "/";
-		#else
-			std::string full_directory = "/";
-		#endif
 			AppendFileName( full_directory, filename );
 			return full_directory;
 		}
@@ -113,6 +108,7 @@ namespace elix {
 
 		}
 	}
+
 	#elif defined(ANDROID_NDK)
 	namespace directory {
 		std::string User( std::string subdirectory, bool roaming, std::string filename )
@@ -167,13 +163,13 @@ namespace elix {
 		{
 			std::string full_directory = "./";
 
-		#if defined(__WINDOWS__) || defined(__GNUWIN32__)
+			#if defined(__WINDOWS__) || defined(__GNUWIN32__)
 			bool valid = true;
 			char directory[MAX_PATH];
 			valid = SHGetSpecialFolderPath(NULL, directory, (roaming ? CSIDL_APPDATA : CSIDL_LOCAL_APPDATA), 1);
 			if ( valid )
 				full_directory = directory;
-		#else
+			#else
 			/* POSIX + XDG */
 			char * home_path = getenv( "XDG_DATA_HOME" );
 			/* If XDG_DATA_HOME not set use HOME instead  */
@@ -196,7 +192,7 @@ namespace elix {
 				full_directory.assign(home_path);
 			}
 
-		#endif
+			#endif
 
 			AppendDirectory( full_directory, elix::program::_user );
 			elix::path::Create( full_directory );
@@ -368,10 +364,6 @@ namespace elix {
 		}
 	}
 	#endif
-
-
-
-
 
 }
 

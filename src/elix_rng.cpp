@@ -8,8 +8,39 @@ Permission is granted to anyone to use this software for any purpose, including 
 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 ****************************/
-#ifndef _ELIX_PRIVATE_HPP_
-#define ELIX_VERSION 0.94
-#define ELIX_VERSION_STRING "0.94"
 
-#endif
+/* Just a wrapper */
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include "elix_intdef.h"
+#include "elix_string.hpp"
+
+namespace elix
+{
+	namespace rng
+	{
+		time_t seed = 0;
+
+		inline void SetSeed()
+		{
+			if ( seed == 0 )
+			{
+				seed = time(NULL);
+				std::srand( seed );
+			}
+		}
+
+		int32_t GetRandomNumber()
+		{
+			SetSeed();
+			return static_cast<int32_t>( rand() );
+		}
+		std::string GetRandomString()
+		{
+			SetSeed();
+			return string::FromInt( GetRandomNumber() );
+		}
+
+	}
+}

@@ -1,5 +1,5 @@
 /****************************
-Copyright © 2006-2014 Luke Salisbury
+Copyright © 2006-2015 Luke Salisbury
 This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held liable for any damages arising from the use of this software.
 
 Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter it and redistribute it freely, subject to the following restrictions:
@@ -24,7 +24,7 @@ namespace elix {
 			size_t pos;
 			while( str.length() && str.at(0) == '.' ) // Don't start with a .
 				str.erase( 0, 1 );
-			while( (pos = str.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-.")) != std::string::npos )
+			while( (pos = str.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_-.[]")) != std::string::npos )
 				str.erase( pos, 1 );
 		}
 
@@ -54,6 +54,10 @@ namespace elix {
 				}
 			}
 		}
+		/**
+		 * @brief Trim
+		 * @param source
+		 */
 		void Trim( std::string * source )
 		{
 			if ( source->size() )
@@ -63,6 +67,11 @@ namespace elix {
 			}
 		}
 
+		/**
+		 * @brief Truncate
+		 * @param source
+		 * @param requested_length
+		 */
 		void Truncate( std::string & source, size_t requested_length )
 		{
 			if ( source.length() > requested_length )
@@ -70,15 +79,18 @@ namespace elix {
 				size_t center_char = requested_length/2;
 				size_t remove_char_count = source.length() - requested_length;
 
-				//center_char -= !!(remove_char_count%2);
 
 				source.replace( center_char, remove_char_count, "..." ); // …
 			}
 		}
 
+		/**
+		 * @brief TruncateLines
+		 * @param source
+		 * @param requested_length
+		 */
 		void TruncateLines( std::string & source, size_t requested_length )
 		{
-			//
 			std::string::size_type line_break = 0;
 			std::string::size_type line_start = 0;
 			std::string::size_type line_length = 0;
@@ -100,8 +112,7 @@ namespace elix {
 
 					if ( line_length > requested_length )
 					{
-						source.replace( center_char, remove_char_count, "..." ); // …
-
+						source.replace( center_char - (remove_char_count/2), remove_char_count, "..." ); // …
 					}
 
 					line_start = line_break;
@@ -111,6 +122,11 @@ namespace elix {
 			}
 		}
 
+		/**
+		 * @brief Hash
+		 * @param str
+		 * @return
+		 */
 		uint32_t Hash( std::string str )
 		{
 			uint32_t hash = 0;
@@ -128,6 +144,14 @@ namespace elix {
 			return hash;
 		}
 		std::string FromInt(int32_t value)
+		{
+			std::string str;
+			std::ostringstream stream("");
+			stream << value;
+			str = stream.str();
+			return str;
+		}
+		std::string FromInt64(int64_t value)
 		{
 			std::string str;
 			std::ostringstream stream("");
@@ -183,6 +207,25 @@ namespace elix {
 			}
 			return false;
 		}
+
+		std::string HexFromInt32(int32_t value)
+		{
+			std::string str;
+			std::ostringstream stream("");
+			stream << std::hex << value;
+			str = stream.str();
+			return str;
+		}
+		std::string HexFromInt64(int64_t value)
+		{
+			std::string str;
+			std::ostringstream stream("");
+			stream << std::hex << value;
+			str = stream.str();
+			return str;
+		}
+
+
 	}
 }
 
