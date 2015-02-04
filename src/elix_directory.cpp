@@ -110,6 +110,7 @@ namespace elix {
 	}
 
 	#elif defined(ANDROID_NDK)
+	#include <android/log.h>
 	namespace directory {
 		std::string User( std::string subdirectory, bool roaming, std::string filename )
 		{
@@ -126,6 +127,9 @@ namespace elix {
 
 			AppendFileName( full_directory, filename );
 
+
+			__android_log_print(ANDROID_LOG_INFO, "elix", "directory::user = %s", full_directory.c_str() );
+
 			return full_directory;
 		}
 
@@ -141,19 +145,7 @@ namespace elix {
 
 		std::string Resources( std::string subdirectory, std::string filename )
 		{
-			std::string full_directory = User("share", "");
-
-			AppendDirectory( full_directory, elix::program::_user );
-			elix::path::Create( full_directory );
-
-			AppendDirectory( full_directory, subdirectory );
-			elix::path::Create( full_directory );
-
-			AppendFileName( full_directory, filename );
-
-			return full_directory;
-
-
+			return User(subdirectory, false, filename);
 		}
 	}
 	#else

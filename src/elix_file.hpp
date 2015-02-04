@@ -6,7 +6,8 @@
 #include "elix_path.hpp"
 #include "elix_intdef.h"
 
-typedef FILE* file_pointer;
+//typedef FILE* file_pointer;
+typedef void* file_pointer;
 typedef void* data_pointer;
 
 namespace elix {

@@ -19,13 +19,15 @@ Permission is granted to anyone to use this software for any purpose, including 
 #include <cstring>
 #include "elix_endian.hpp"
 #include "elix_file.hpp"
+#include <SDL.h>
+
 
 namespace elix {
 	File::File(std::string filename, bool write)
 	{
 		this->error = "";
 		this->path = filename;
-		this->handle = fopen(this->path.c_str(), (write ? "wb" : "rb") );
+		this->handle = SDL_RWFromFile(this->path.c_str(), (write ? "wb" : "rb") );
 		this->_length = 0;
 		this->ErrorCallback = NULL;
 		if ( !this->handle )
@@ -38,9 +40,9 @@ namespace elix {
 			this->writable = write;
 			if ( !this->writable )
 			{
-				fseek( (FILE *)this->handle, 0, SEEK_END );
-				this->_length = ftell( (FILE *)this->handle );
-				fseek( (FILE *)this->handle, 0, SEEK_SET );
+				SDL_RWseek( (SDL_RWops *)this->handle, 0, RW_SEEK_END );
+				this->_length = SDL_RWtell( (SDL_RWops *)this->handle );
+				SDL_RWseek( (SDL_RWops *)this->handle, 0, RW_SEEK_SET );
 			}
 		}
 	}
@@ -49,7 +51,7 @@ namespace elix {
 	{
 		if ( this->handle )
 		{
-			fclose( (FILE*)this->handle );
+			SDL_RWclose( (SDL_RWops*)this->handle );
 		}
 
 	}
@@ -62,28 +64,28 @@ namespace elix {
 	uint32_t File::Length()
 	{
 		int32_t len = 0;
-		int32_t pos = ftell( (FILE *)this->handle );
-		fseek( (FILE *)this->handle, 0, SEEK_END );
-		len = ftell( (FILE *)this->handle );
-		fseek( (FILE *)this->handle, pos, SEEK_SET );
+		int32_t pos = SDL_RWtell( (SDL_RWops *)this->handle );
+		SDL_RWseek( (SDL_RWops *)this->handle, 0, RW_SEEK_END );
+		len = SDL_RWtell( (SDL_RWops *)this->handle );
+		SDL_RWseek( (SDL_RWops *)this->handle, pos, RW_SEEK_SET );
 		return (uint32_t) len;
 	}
 
 	int32_t File::Seek( int32_t pos )
 	{
-		return fseek( (FILE *)this->handle, (int32_t)pos, SEEK_SET );
+		return SDL_RWseek( (SDL_RWops *)this->handle, (int32_t)pos, RW_SEEK_SET );
 	}
 
 	int32_t File::Tell()
 	{
-		return ftell( (FILE *)this->handle );
+		return SDL_RWtell( (SDL_RWops *)this->handle );
 	}
 
 	bool File::EndOfFile()
 	{
 		if ( this->handle )
 		{
-			if ( feof( (FILE *)this->handle ) == 0 )
+			if ( this->_length > SDL_RWtell( (SDL_RWops *)this->handle ) )
 			{
 				return false;
 			}
@@ -103,8 +105,10 @@ namespace elix {
 
 			this->Seek( startPostion );
 			do {
-				c = fgetc( (FILE *)this->handle );
-				check = c;
+
+
+				c =  SDL_RWread( (SDL_RWops *)this->handle, &check, 1, 1 );
+
 
 				if ( check == needle[0] )
 				{
@@ -114,8 +118,7 @@ namespace elix {
 
 					while ( scan_count < needleLength )
 					{
-						c = fgetc( (FILE *)this->handle );
-						check = c;
+						c =  SDL_RWread( (SDL_RWops *)this->handle, &check, 1, 1 );
 
 						if ( check != needle[scan_count] )
 						{
@@ -152,8 +155,7 @@ namespace elix {
 			std::cerr << __FUNCTION__ << ": Reading only " << this->_length / size << " instead of " << count<< std::endl;
 			count = this->_length / size;
 		}
-
-		uint32_t read = fread(buffer, size, count, (FILE *)this->handle);
+		uint32_t read = SDL_RWread( (SDL_RWops *)this->handle, buffer, size, count );
 
 		if ( read == count*size )
 		{
@@ -176,7 +178,7 @@ namespace elix {
 		}
 		if ( buffer )
 		{
-			uint32_t read = fread(buffer, size, count, (FILE *)this->handle);
+			uint32_t read = SDL_RWread( (SDL_RWops *)this->handle, buffer, size, count );
 			return read;
 		}
 		return 0;
@@ -201,8 +203,9 @@ namespace elix {
 		}
 		if ( *buffer != NULL )
 		{
+			uint32_t read = SDL_RWread( (SDL_RWops *)this->handle, buffer, this->_length, 1 );
 
-			if ( fread(*buffer, this->_length, 1, (FILE *)this->handle) )
+			if ( read )
 			{
 				//if ( addnull )
 				//	buffer[this->_length] = 0;
@@ -215,7 +218,7 @@ namespace elix {
 	uint32_t File::ReadUint32( bool sysvalue )
 	{
 		uint32_t value = 0;
-		uint32_t read = fread(&value, sizeof(uint32_t), 1, (FILE *)this->handle);
+		uint32_t read = SDL_RWread( (SDL_RWops *)this->handle, &value, sizeof(uint32_t), 1 );
 		if ( !read )
 		{
 			if ( this->ErrorCallback )
@@ -233,7 +236,9 @@ namespace elix {
 	uint16_t File::ReadUint16( bool sysvalue )
 	{
 		uint16_t value = 0;
-		if ( !fread(&value, sizeof(uint16_t), 1, (FILE *)this->handle) )
+		uint32_t read = SDL_RWread( (SDL_RWops *)this->handle, &value, sizeof(uint16_t), 1 );
+
+		if ( !read )
 		{
 			if ( this->ErrorCallback )
 				this->ErrorCallback( "Read failed." );
@@ -255,7 +260,8 @@ namespace elix {
 		{
 			return 0;
 		}
-		if ( !fread( &value, sizeof(uint8_t), 1, (FILE *)this->handle ) )
+		uint32_t read = SDL_RWread( (SDL_RWops *)this->handle, &value, sizeof(uint8_t), 1 );
+		if ( !read )
 		{
 			if ( this->ErrorCallback )
 				this->ErrorCallback( "Read failed." );
@@ -309,7 +315,7 @@ namespace elix {
 
 		while ( this->_length > pos )
 		{
-			fread( &value, sizeof(uint8_t), 1, (FILE *)this->handle );
+			SDL_RWread( (SDL_RWops *)this->handle, &value, sizeof(uint8_t), 1 );
 			if ( this->EndOfFile() || value == 0 )
 				return false;
 			else if ( value == 10 )
@@ -330,11 +336,11 @@ namespace elix {
 
 		uint8_t data_size = 0;
 
-		if ( fread( &data_size, sizeof(uint8_t), 1, (FILE *)this->handle ) )
+		if ( SDL_RWread( (SDL_RWops *)this->handle, &data_size, sizeof(uint8_t), 1 ) )
 		{
 			if ( data_size == size )
 			{
-				fread(buffer, size, 1, (FILE *)this->handle);
+				SDL_RWread( (SDL_RWops *)this->handle, &buffer, size, 1 );
 				return true;
 			}
 			else
@@ -351,7 +357,7 @@ namespace elix {
 	{
 		if ( !Exist() )
 			return false;
-		return (fwrite( buffer, size, count, (FILE *)this->handle ) ? true : false);
+		return (SDL_RWwrite( (SDL_RWops *)this->handle, buffer, size, count ) ? true : false);
 	}
 
 	bool File::Write( uint32_t value, bool sysvalue )
@@ -361,11 +367,11 @@ namespace elix {
 		if ( !sysvalue )
 		{
 			uint32_t uvalue = elix::endian::big32( value );
-			return ( fwrite( &uvalue, sizeof(uint32_t), 1, (FILE *)this->handle ) ? true : false );
+			return ( SDL_RWwrite( (SDL_RWops *)this->handle,  &uvalue, sizeof(uint32_t), 1 ) ? true : false );
 		}
 		else
 		{
-			return ( fwrite( &value, sizeof(uint32_t), 1, (FILE *)this->handle ) ? true : false );
+			return ( SDL_RWwrite( (SDL_RWops *)this->handle, &value, sizeof(uint32_t), 1 ) ? true : false );
 		}
 	}
 
@@ -376,18 +382,18 @@ namespace elix {
 		if ( !sysvalue )
 		{
 			uint16_t uvalue = elix::endian::big16( value );
-			return ( fwrite( &uvalue, sizeof(uint16_t), 1, (FILE *)this->handle ) ? true : false );
+			return ( SDL_RWwrite( (SDL_RWops *)this->handle, &uvalue, sizeof(uint16_t), 1 ) ? true : false );
 		}
 		else
 		{
-			return ( fwrite( &value, sizeof(uint16_t), 1, (FILE *)this->handle ) ? true : false );
+			return ( SDL_RWwrite( (SDL_RWops *)this->handle, &value, sizeof(uint16_t), 1 ) ? true : false );
 		}
 	}
 
 	bool File::Write( uint8_t value )
 	{
 		if ( Exist() )
-			return ( fwrite( &value, sizeof(uint8_t), 1, (FILE *)this->handle ) ? true : false );
+			return ( SDL_RWwrite( (SDL_RWops *)this->handle, &value, sizeof(uint8_t), 1 ) ? true : false );
 		return false;
 	}
 
@@ -398,7 +404,7 @@ namespace elix {
 		bool result = false;
 		if ( value.length() )
 		{
-			result = ( fwrite( value.c_str(), sizeof(uint8_t), value.length(), (FILE *)this->handle ) ? true : false );
+			result = ( SDL_RWwrite( (SDL_RWops *)this->handle, value.c_str(), sizeof(uint8_t), value.length() ) ? true : false );
 		}
 		result = this->Write( (uint8_t)'\0' );
 		return result;
@@ -411,7 +417,7 @@ namespace elix {
 		bool result = false;
 		if ( this->handle )
 		{
-			result = ( fwrite( value.c_str(), sizeof(uint8_t), value.length(), (FILE *)this->handle ) ? true : false );
+			result = ( SDL_RWwrite( (SDL_RWops *)this->handle, value.c_str(), sizeof(uint8_t), value.length() ) ? true : false );
 		}
 		return result;
 	}
@@ -420,8 +426,8 @@ namespace elix {
 	{
 		if ( !Exist() )
 			return false;
-		fwrite( &size, sizeof(uint8_t), 1, (FILE *)this->handle );
-		return (fwrite( buffer, size, 1, (FILE *)this->handle ) ? true : false);
+		SDL_RWwrite( (SDL_RWops *)this->handle, &size, sizeof(uint8_t), 1 );
+		return (SDL_RWwrite( (SDL_RWops *)this->handle, buffer, size, 1 ) ? true : false);
 	}
 
 
