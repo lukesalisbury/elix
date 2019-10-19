@@ -6,7 +6,7 @@ Simple Cross-Platform Helper Functions.
 - std::string functions
 - PNG Loader
 
-* Currently being rewritting in the rewrite-2019 branch *
+*Currently being rewritting in the rewrite-2019 branch*
 
 # License
 Copyright ©  Luke Salisbury
