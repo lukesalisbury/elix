@@ -8,32 +8,13 @@ Rewritten in C style C++. Still a work in progress
 ## Core - *elix_core.h*
 ### New Macros
 `ASSERT(Expression)` * Triggers debugger on failure*
-`NULLIFY(Variable)` * If Variable is not null, delete and set to null
+
+`NULLIFY(Variable)` * If Variable is not null, delete and set to null*
+
 ### New Types
 elix_colour - 32bit colour value as hex or r,b,g,a values
-`union elix_colour {
-	uint32_t hex;
-	struct {
-		uint8_t a;
-		uint8_t b;
-		uint8_t g;
-		uint8_t r;
-	};
-};`
+
 elix_graphic_data - Used to describe an 2D graphic surface
-`struct elix_graphic_data {
-	union {
-		uint8_t * data;
-		uint32_t * pixels;
-	};
-	uint32_t width;
-	uint32_t height;
-	uint64_t size = 0;
-	uint64_t pixel_count = 0;
-	uint8_t bpp = 4;
-	uint8_t format = 0;
-	uint32_t ref = 1;
-};`
 
 ## C String - *elix_cstring.cpp*
 Helper functions to deal with C-Strings
