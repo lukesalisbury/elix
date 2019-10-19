@@ -1,0 +1,119 @@
+#include "elix_hashmap.hpp"
+#include "elix_cstring.hpp"
+#include <string.h>
+
+elix_hashmap * elix_hashmap_create() {
+	elix_hashmap * hm = new elix_hashmap();
+	return hm;
+}
+
+void elix_hashmap_insert_hash(elix_hashmap * hm, uint32_t key, data_pointer value) {
+	if ( hm->active.used < ELIX_HASHMAP_POOL_SIZE ) {
+		uint32_t * current = &hm->active.keys[0];
+		for (size_t c = 0; c< ELIX_HASHMAP_POOL_SIZE; c++, current++ ) {
+			if ( *current == 0) {
+				if ( hm->active.values[c] == nullptr ) {
+					*current = key;
+					hm->active.values[c] = value;
+					hm->active.used++;
+					return;
+				} else {
+					LOG_MESSAGE("Hashmap has no nullptr value");
+				}
+			}
+		}
+	}
+	if ( !hm->next ) {
+		hm->next = new elix_hashmap();
+	}
+	if ( !hm->next ) {
+		LOG_MESSAGE("Can not create hashmap");
+		return;
+	}
+	elix_hashmap_insert_hash(hm->next, key, value);
+}
+
+data_pointer elix_hashmap_value_hash(elix_hashmap * hm, uint32_t key) {
+	if ( !hm || !hm->active.used) {
+		return nullptr;
+	}
+
+	uint32_t * current = &hm->active.keys[0];
+	for (size_t c = 0; c< ELIX_HASHMAP_POOL_SIZE; c++, current++ ) {
+		if ( *current == key) {
+			if ( hm->active.values[c] == nullptr ) {
+				LOG_MESSAGE("%zu is empty", c);
+			}
+			return hm->active.values[c];
+		}
+	}
+	if ( hm->next ) {
+		return elix_hashmap_value_hash(hm->next, key);
+	}
+
+	return nullptr;
+}
+
+void elix_hashmap_remove_hash(elix_hashmap * hm, uint32_t key, void (*delete_func)(data_pointer*)) {
+	if ( !hm->active.used && !hm->next ) {
+		return;
+	}
+
+	uint32_t * current = &hm->active.keys[0];
+	for (size_t c = 0; c< ELIX_HASHMAP_POOL_SIZE; c++, current++ ) {
+		if ( *current == key) {
+			*current = 0;
+			if ( delete_func ) {
+				delete_func(&hm->active.values[c]);
+			} else {
+				hm->active.values[c] = nullptr;
+			}
+			return;
+		}
+	}
+	if ( hm->next ) {
+		return elix_hashmap_remove_hash(hm->next, key, delete_func);
+	}
+	return;
+}
+
+void  elix_hashmap_clear(elix_hashmap * hm, void (*delete_func)(data_pointer*)) {
+	if ( hm->next ) {
+		elix_hashmap_clear(hm->next,delete_func);
+		delete hm->next;
+		hm->next = nullptr;
+
+	}
+	if ( delete_func ) {
+		data_pointer * current = &hm->active.values[0];
+		for (size_t c = 0; c< ELIX_HASHMAP_POOL_SIZE; c++, current++ ) {
+			delete_func(current);
+		}
+	}
+	hm->active.used = 0;
+	memset(&hm->active.keys, 0 , sizeof(uint32_t)*ELIX_HASHMAP_POOL_SIZE);
+	memset(&hm->active.values, 0 , sizeof(uintptr_t)*ELIX_HASHMAP_POOL_SIZE);
+}
+
+bool elix_hashmap_destroy(elix_hashmap ** hm, void (*delete_func)(data_pointer*)) {
+	elix_hashmap_clear((*hm), delete_func);
+	delete (*hm);
+	(*hm) = nullptr;
+	return false;
+}
+
+void elix_hashmap_insert(elix_hashmap * hm, const char * key, data_pointer value) {
+	uint32_t hash = elix_hash(key, elix_cstring_length(key));
+	elix_hashmap_insert_hash( hm, hash, value);
+}
+
+void elix_hashmap_remove(elix_hashmap * hm, const char * key, void (*delete_func)(data_pointer*)) {
+	uint32_t hash = elix_hash(key, elix_cstring_length(key));
+	return elix_hashmap_remove_hash(hm, hash, delete_func);
+}
+
+data_pointer elix_hashmap_value(elix_hashmap * hm, const char * key) {
+	uint32_t hash = elix_hash(key, elix_cstring_length(key));
+	return elix_hashmap_value_hash(hm, hash);
+}
+
