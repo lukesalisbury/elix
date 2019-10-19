@@ -1,7 +1,7 @@
 Unless specified, the source code are distributed under the 
 zLib license, which is reproduced below:
 
-Copyright (c) 2007-2013 Luke Salisbury
+Copyright ©  Luke Salisbury
 
 This software is provided 'as-is', without any express or implied
 warranty.  In no event will the authors be held liable for any damages
@@ -19,4 +19,4 @@ freely, subject to the following restrictions:
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
   
-   Copyright ©  Luke Salisbury
+
