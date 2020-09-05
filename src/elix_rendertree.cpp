@@ -1,0 +1,67 @@
+/***********************************************************************************************************************
+Copyright © Luke Salisbury
+This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held
+liable for any damages arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter
+it and redistribute it freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software. If
+   you use this software in a product, an acknowledgment in the product documentation would be appreciated but is not
+   required.
+2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original
+   software.
+3. This notice may not be removed or altered from any source distribution.
+***********************************************************************************************************************/
+#include "elix_rendertree.hpp"
+#include "elix_rgbabuffer.hpp"
+
+#include <string>
+
+uint32_t elix_rendertreeitem_to_rgbabuffer(elix_rendertree_item * item, rbgabuffer_context * ctx) {
+
+	switch (item->data_type) {
+		case ERTD_STRING:
+			//std::string *str = static_cast<std::string *>(item->data);
+			rbgabuffer_FillColor(ctx, item->render_style.colour.hex);
+			rbgabuffer_fillText(ctx, "Hello World", 10, 16, 500);
+			break;
+
+		case ERTD_EMPTY:
+			break;
+		case ERTD_IMAGE:
+			break;
+		case ERTD_EXTERNAL:
+			break;
+		case ERTD_COUNT:
+		case ERTD_UPDATE:
+		break;
+		default:
+			rbgabuffer_BeginPath(ctx);
+			rbgabuffer_MoveTo(ctx, item->render_style.x, item->render_style.y);
+			rbgabuffer_LineTo(ctx, item->render_style.x + item->render_style.width, item->render_style.y);
+			rbgabuffer_LineTo(ctx, item->render_style.x + item->render_style.width, item->render_style.y + item->render_style.height);
+			rbgabuffer_LineTo(ctx, item->render_style.x, item->render_style.y + item->render_style.height);
+			rbgabuffer_FillColor(ctx, item->render_style.backgroundColour.hex);
+			rbgabuffer_Fill(ctx);
+			break;
+	}
+
+	
+	for(elix_rendertree_item * child : item->children) {
+		elix_rendertreeitem_to_rgbabuffer(child, ctx);
+	}
+
+	return 0;
+}
+uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all) {
+	ASSERT(tree);
+	ASSERT(ctx);
+	if ( tree->root ) {
+		elix_rendertreeitem_to_rgbabuffer(tree->root, ctx);
+		
+
+	}
+
+	return 0;
+}

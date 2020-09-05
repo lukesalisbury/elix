@@ -1,30 +1,91 @@
-# Elix
+Elix
+====================================
 Simple Cross-Platform Helper Functions.
 
-- File handling
-- System Paths
-- std::string functions
-- PNG Loader
+Rewritten in C style C++. Still a work in progress
 
-*Currently being rewritting in the rewrite-2019 branch*
 
-# License
-Copyright ©  Luke Salisbury
+## Core - *elix_core.h*
+### New Macros
+`ASSERT(Expression)` * Triggers debugger on failure*
 
-This software is provided 'as-is', without any express or implied
-warranty.  In no event will the authors be held liable for any damages
-arising from the use of this software.
+`NULLIFY(Variable)` * If Variable is not null, delete and set to null*
 
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
+### New Types
+elix_colour - 32bit colour value as hex or r,b,g,a values
 
-1. The origin of this software must not be misrepresented; you must not
-   claim that you wrote the original software. If you use this software
-   in a product, an acknowledgment in the product documentation would be
-   appreciated but is not required.
-2. Altered source versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.
-3. This notice may not be removed or altered from any source distribution.
-  
+elix_graphic_data - Used to describe an 2D graphic surface
+
+## C String - *elix_cstring.cpp*
+Helper functions to deal with C-Strings
+- bool elix_cstring_has_suffix( const char * str, const char * suffix);
+- size_t elix_cstring_find_not_of( char * str, char * search, size_t offset = 0);
+- void  elix_cstring_sanitise( char * string );
+- char * elix_cstring_substr( const char * source, ssize_t pos = 0, ssize_t len = SSIZE_MAX );
+
+## Endian - *elix_endian.hpp*
+Switch integers between Network Endianness and Host Endianness.
+
+## Hashmap - *elix_hashmap*
+
+
+## HTML Parser - *elix_html.hpp*
+Reads a HTML and create a tree node structure.
+
+## RGBA Buffer - *elix_rgbabuffer.hpp*
+Canvas interface for elix_graphic_data. Borrows from the HTML's Canvas.
+
+## File & File Info
+Access file content and details about file.
+
+## Path & Path Info
+
+## Program Info and Settings
+ - Name [string]
+ - Version [string]
+ - Major Version [string] *Used for Directory*
+ - Executable Path [string]
+ - Base Path [string]
+
+## System Directories/Path File
+Gets:
+* Private or Public Document directory
+* User's Data directory AKA XDG_DATA_HOME/[ProgramName]-[ProgramMajorVersion] or CSIDL_Local_APPDATA/[ProgramName]-[ProgramMajorVersion]
+* User's Cache directory
+* Program's Resources directory aka /usr/share/[ProgramName]-[ProgramMajorVersion]
+
+## System Windows - *elix_os_window.hpp*
+Simple windows creation and event handling. Currently Windows and Wayland
+
+*I recommend using SDL2 instead of this*
+
+## Data Packages
+
+
+# TODO
+* HTTP Client
+* HTTP Server
+* Tree Node Render
+* OS Integration/File Association
+
+
+
+
+
+# Defines, Settings, and other notes
+
+## Defines
+
+### PLATFORM_[Platform Name]
+
+### PLATFORM_BITS
+### PLATFORM_ARCH
+
+### PLATFORM_SDL2_ONLY and PLATFORM_SDL2
+Force the use of SDL2 instead of the native platform code.
+
+
+#### ELIX_SKIP_CORE_LOG
+Built-ins LOG_+ functions do not print anything.
+
 
