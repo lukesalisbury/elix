@@ -40,4 +40,6 @@ char * elix_program_directory_user( const elix_program_info * program_info, bool
 char * elix_program_directory_resources(const elix_program_info * program_info, const char * filename = nullptr , uint8_t override_lookup = EPRD_AUTO);
 char * elix_program_directory_cache_file( const elix_program_info * program_info, const char * filename);
 
+char * elix_program_directory_root( const elix_program_info * program_info, const char * filename = nullptr);
+
 #endif // ELIX_PROGRAM_HPP

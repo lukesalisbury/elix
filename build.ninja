@@ -1,0 +1,2 @@
+include build/default.ninja
+include scripts/core.ninja

@@ -1,6 +1,6 @@
 #include "elix_package.hpp"
 #include "elix_file.hpp"
-
+#include "elix_endian.hpp"
 
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES 1
 #define MINIZ_NO_STDIO 1
@@ -23,7 +23,6 @@ inline void elix_package_stored_file__destroy(elix_package_stored_file * stored)
 	NULLIFY(stored->raw.data);
 	NULLIFY(stored->compressed.data);
 }
-
 
 
 uint16_t elix_package__scan( elix_package * pkg ){
@@ -187,7 +186,7 @@ void elix_package_info( elix_package * pkg ) {
 
 		switch (pkg->header_type) {
 			case EP_GAME_OLD:
-				LOG_MESSAGE("Title: %s [%zx] - CRC: %u Logo Size: %u", pkg->header.oldgame.name, pkg->header.oldgame.id , pkg->header.oldgame.crc, pkg->header.oldgame.logo_length);
+				LOG_MESSAGE("Title: %s [" pZX "] - CRC: %u Logo Size: %u", pkg->header.oldgame.name, pkg->header.oldgame.id , pkg->header.oldgame.crc, pkg->header.oldgame.logo_length);
 			break;
 			default:
 				LOG_MESSAGE("Unknown Header Type");
@@ -195,7 +194,7 @@ void elix_package_info( elix_package * pkg ) {
 		}
 
 		size_t fc = elix_package_info__print(&pkg->files);
-		LOG_MESSAGE("Files: %zu", fc);
+		LOG_MESSAGE("Files: " pZU, fc);
 	}
 }
 
@@ -221,7 +220,7 @@ bool elix_package_file_uncompressed(elix_package_stored_file * info, elix_packag
 
 
 elix_package_data elix_package_get_file( elix_package * pkg, const char * file ){
-	elix_package_data buffer = {0, 0, nullptr};
+	elix_package_data buffer;
 	//elix_file_seek(&pkg->file, 0);
 	elix_package_stored_file * info = (elix_package_stored_file *)elix_hashmap_value(&pkg->files, file);
 	if ( info ) {

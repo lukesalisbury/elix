@@ -17,8 +17,9 @@ it and redistribute it freely, subject to the following restrictions:
 #define ELIX_RENDERTREE_HPP
 
 #include "elix_core.h"
+#include <vector>
 
-typedef int32_t elix_dimension;
+using elix_dimension = int32_t;
 
 enum elix_rendertree_datatype {
 	ERTD_EMPTY = 0x00,
@@ -29,7 +30,14 @@ enum elix_rendertree_datatype {
 	ERTD_UPDATE = 0x80
 };
 
+enum elix_rendertree_display {
+	ERT_INLINE,
+	ERT_INLINEBLOCK,
+	ERT_BLOCK
+};
+
 struct elix_rendertree_item;
+using elix_rendertree_itemlist = std::vector<elix_rendertree_item*>;
 
 struct elix_rendertree_styletext {
 	char * text = nullptr;
@@ -41,9 +49,10 @@ struct elix_rendertree_style {
 };
 
 struct elix_rendertree_computedstyle {
-	elix_dimension x = 0, y = 0, width =320, height = 320;
+	elix_dimension x = 0, y = 0, width = 320, height = 320;
 	elix_colour backgroundColour = {0xFFFFFFFF};
 	elix_colour colour = {0x000000FF};
+	elix_rendertree_display display = ERT_BLOCK;
 };
 
 struct elix_rendertree_item {
@@ -51,13 +60,13 @@ struct elix_rendertree_item {
 	elix_rendertree_style style;
 	data_pointer data = nullptr;
 	elix_rendertree_datatype data_type = ERTD_EMPTY;
-	elix_rendertree_item ** children = nullptr;
+	elix_rendertree_itemlist children;
 	elix_rendertree_item * parent = nullptr;
 };
 
 struct elix_rendertree {
 	elix_rendertree_item * root = nullptr;
-	elix_dimension width =320, height = 320;
+	elix_dimension width = 320, height = 320;
 };
 
 

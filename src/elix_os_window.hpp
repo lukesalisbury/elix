@@ -6,9 +6,6 @@
 #include "elix_events.hpp"
 
 
-
-
-
 struct elix_os_window_common {
 	elix_graphic_data * display_buffer;
 	elix_uv32_2 position;
@@ -34,7 +31,8 @@ struct elix_os_window;
 #elif defined PLATFORM_3DS
 	#include "elix_os_window_3ds.hpp"
 #else
-#error "Unsupported platform"
+	#error "Unsupported platform"
+
 #endif
 
 elix_os_window * elix_os_window_create( elix_uv32_2 dimension, elix_uv16_2 scale = {1,1}); //Todo: Add Extra options

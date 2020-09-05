@@ -132,7 +132,7 @@ struct elix_v2 {
 rbgabuffer_context * rbgabuffer_create_context(elix_graphic_data * external_buffer, const elix_uv32_2 requested_dimensions );
 rbgabuffer_context * rgbabuffer_delete_context(rbgabuffer_context *& ctx);
 void rbgabuffer_testpattern(rbgabuffer_context *ctx);
-uint32_t rbgabuffer_get_pixel(rbgabuffer_context * ctx, int32_t x , int32_t y);
+uint32_t rbgabuffer_get_pixel(rbgabuffer_context * ctx, uint32_t x, uint32_t y);
 
 void rbgabuffer_BeginPath(rbgabuffer_context* ctx);
 void rbgabuffer_MoveTo(rbgabuffer_context* ctx, float x, float y);

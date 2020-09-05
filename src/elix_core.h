@@ -28,14 +28,28 @@
 #define ASSERT(Expression) if(!(Expression)) {__builtin_trap();}
 //#define ASSERT(Expression) if(!(Expression)) {*(int *)0 = 0;}
 #define UNUSEDARG __attribute__((unused))
+#define MUSTFREEARG
+#define REARG
 
 #define ARRAYCOUNT(Array) (sizeof(Array) / sizeof((Array)[0]))
 
 #define NULLIFY(f) if (f) { delete f; f = nullptr; }
 
 #define PI32 3.14159265359f
+#define PI64 3.14159265358979323846
 #define TAU32 6.28318530717958647692f
 #define DEG2RAD(a) a * 0.01745329251994329576923690768489f
+
+#ifdef PLATFORM_WINDOWS
+#define pZD "%Id"
+#define pZX "%Ix"
+#define pZU "%Iu"
+#else
+#define pZD "%zd"
+#define pZX "%zx"
+#define pZU "%zu"
+#endif
+
 
 typedef void* data_pointer; // uintptr_t
 
@@ -66,9 +80,11 @@ struct elix_graphic_data {
 	uint32_t height;
 	uint64_t size = 0;
 	uint64_t pixel_count = 0;
+	uint32_t ref = 1;
 	uint8_t bpp = 4;
 	uint8_t format = 0;
-	uint32_t ref = 1;
+	uint16_t _unsued = 0;
+
 };
 
 struct elix_string {
@@ -78,8 +94,14 @@ struct elix_string {
 };
 
 struct elix_databuffer {
-	uint64_t size;
-	uint8_t * data;
+	uint64_t size = 0;
+	uint8_t * data = nullptr;
+};
+
+struct elix_allocated_buffer {
+	uint8_t data[1024];
+	uint16_t data_size = 1024;
+	uint16_t actual_size = 0;
 };
 
 struct elix_path {
@@ -94,12 +116,14 @@ struct elix_path {
 	#define LOG_OUTPUT_MESSAGE stdout
 
 	#define NAMEDLOG_MESSAGE(N, M, ...) printf("%23s | " M "\n", N, ##__VA_ARGS__)
-	#define LOG_MESSAGE(M, ...) printf("%18s:%04d | " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+	#define LOG_INFO(M, ...) printf( M "\n", ##__VA_ARGS__)
+	#define LOG_MESSAGE(M, ...) printf("%24s:%04d | " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 	#define LOGF_MESSAGE(M, ...) printf("%21s() | " M "\n", __func__, ##__VA_ARGS__)
 	#define LOG_ERROR(M, ...) fprintf(LOG_OUTPUT_ERROR, "%18s:%04d | " M "\n",__FILE__, __LINE__, ##__VA_ARGS__)
 	#define LOGF_ERROR(M, ...) fprintf(LOG_OUTPUT_ERROR, "%21s() | " M "\n", __func__, ##__VA_ARGS__)
 #else
 	#define NAMEDLOG_MESSAGE(N,M, ...)
+	#define LOG_INFO(M, ...)
 	#define LOG_MESSAGE(M, ...)
 	#define LOG_ERROR(M, ...)
 	#define LOGF_MESSAGE(M, ...)
@@ -135,7 +159,10 @@ inline elix_graphic_data * elix_graphic_data_destroy(elix_graphic_data * buffer)
 
 
 
-
+inline void elix_databuffer_free(elix_databuffer * data) {
+	NULLIFY(data->data);
+	data->size = 0;
+}
 
 
 #endif // ELIX_CORE_HPP

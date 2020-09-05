@@ -19,7 +19,7 @@ void update_buffer_randomly(elix_graphic_data * buffer) {
 	for ( uint32_t q = 0; q < buffer->pixel_count; q++, p++ ) {
 		if ( q % (buffer->width*5) == 0 ) {
 		#if RAND_MAX == 32767
-			c = (rand() * rand()) | 0xFF000000;
+			c = (uint32_t)(rand() * rand()) | 0xFF000000;
 		#else
 			c = rand() | 0xFF000000;
 		#endif
@@ -70,13 +70,39 @@ void test_elix_endian() {
 
 uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
 
+void test_elix_rendertree() {
+	LOG_MESSAGE("--------------------------------------------------------");
+	LOG_MESSAGE("--- Elix Rendertree ------------------------------------");
+
+	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
+
+	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
+	elix_rendertree tree;
+
+	elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
+	while(elix_os_window_handle_events(w) ) {
+		if ( w->flags & EOE_WIN_CLOSE ) {
+			elix_os_window_destroy(w);
+			break;
+		}
+		
+		fps.update();
+		elix_os_window_render(w);
+		//elix_os_system_idle(16000);
+	}
+
+	elix_os_window_destroy( w );
+	delete w;
+
+}
+
 void test_elix_html() {
 	LOG_MESSAGE("--------------------------------------------------------");
 	LOG_MESSAGE("--- Elix HTML Parser -----------------------------------");
 
 	std::string test_html(R"TEXT(<!DOCTYPE html><html>
 	<!-- Commement --><body>Hello <![CDATA[ sdaghkl
- asd]] ]]> 🐨 World 🐱‍🚀</body></html>)TEXT");
+ asd]] ]]> 🐨 World 🐱‍🚀<div><div></div></div></body></html>)TEXT");
 
 	LOG_MESSAGE("%s", test_html.c_str());
 	LOG_MESSAGE("--------------------------------------------------------");
@@ -86,14 +112,14 @@ void test_elix_html() {
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
-
+	elix_rendertree tree = elix::html::get_render_tree(&html);
+	elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
 	while(elix_os_window_handle_events(w) ) {
 		if ( w->flags & EOE_WIN_CLOSE ) {
 			elix_os_window_destroy(w);
 			break;
 		}
-		elix_rendertree tree = elix::html::get_render_tree(&html);
-		elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
+		
 		fps.update();
 		elix_os_window_render(w);
 		//elix_os_system_idle(16000);
@@ -102,7 +128,6 @@ void test_elix_html() {
 	elix_os_window_destroy( w );
 	delete w;
 }
-
 
 
 
@@ -409,8 +434,6 @@ const char * test_string_list[] = {
 };
 
 #include "elix_hashmap.hpp"
-
-
 void test_elix_hash() {
 	LOG_MESSAGE("--------------------------------------------------------");
 	LOGF_MESSAGE("--- Elix Hash ------------------------------------------");
@@ -441,6 +464,25 @@ void test_elix_hash() {
 }
 
 
+
+void test_directory_watch() {
+	LOG_MESSAGE("--------------------------------------------------------");
+	LOGF_MESSAGE("--- Elix File Watcher -----------------------------");
+
+	int64_t timestamp = 0;
+	uint8_t results = elix_file_modified_check("bin/a.txt", timestamp);
+	LOG_MESSAGE("%d: %s", results, ctime(&timestamp));
+	while ( results > 0 ) {
+		results = elix_file_modified_check("bin/a.txt", timestamp);
+		if ( results == 2 ) {
+			LOG_MESSAGE("%d: %s", results, ctime(&timestamp));
+		}
+		elix_os_system_idle(1000);
+	}
+	LOGF_MESSAGE("--------------------------------------------------------");
+}
+
+
 void test_run( const char* name, void (*test)() ) {
 	if ( test ) {
 		struct timespec start, end;
@@ -453,25 +495,28 @@ void test_run( const char* name, void (*test)() ) {
 	}
 }
 
+
+
 int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 {
 	//SetConsoleOutputCP(65001);
-	printf("Console Test: %s\n", "🤔🐱‍🚀" );
+
+	printf("Console Test: %s\n", "🎒🤔🐱‍🚀" );
 
 	program_info = elix_program_info_create(argv[0], "Elix Test Program", "0.4", nullptr);
-
+	//test_run("Program Info", &test_elix_program);
 	//test_run("Endian", &test_elix_endian);
-	//test_run("HTML", &test_elix_html);
+	test_run("Rendertree", &test_elix_rendertree);
 	//test_run("Hash table", &test_elix_hash);
 
-	test_run("CANVAS", &test_elix_os_window);
+	//test_run("CANVAS", &test_elix_os_window);
 
-
+	//test_run("Directory Watcher", &test_directory_watch);
 	//test_elix_rgbabuffer();
 
 	//test_elix_cstring();
 
-	//test_elix_program();
+	//
 
 	//test_elix_os_directory();
 	//test_elix_package();

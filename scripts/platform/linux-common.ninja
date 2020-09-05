@@ -1,0 +1,40 @@
+compiler = gcc
+
+#object_dir = obj-${compile_mode}-${platform_ninja}
+
+binary_prefix = bin/
+binary_suffix = -${compile_mode}-${platform_ninja}
+
+platform_lib = -lstdc++ -lpthread -lm ${platform_lib}
+platform_lib_flags = -std=c++11 -pthread ${platform_lib_flags}
+
+platform_includes= -I"src/platform/${platform_subsystem}" ${platform_includes}
+platform_flags = -std=c++11 -DPLATFORM_LINUX ${platform_flags}
+
+
+# Rules
+rule compile_cpp
+  command = $compiler $platform_includes $platform_flags $compiler_flags $debug_flag -o $out -c $in
+  description = Building $in [C++]
+
+rule compile_c
+  command = $compiler $platform_includes $platform_flags $compiler_flags $debug_flag -o $out -c $in
+  description = Building $in [C]
+
+rule link_shared
+  command = $compiler -shared $platform_lib_flags $in -o $out  $platform_lib $compiler_lib $debug_flag
+  description = Creating $out
+
+rule link_static
+  command = $compiler -static $platform_lib_flags $in -o $out  $platform_lib $compiler_lib $debug_flag
+  description = Creating $out
+
+rule link
+  command = $compiler $platform_lib_flags $in -o $out  $platform_lib $compiler_lib $debug_flag
+  description = Creating $out
+
+rule clean
+  command = rm -rf $object_dir
+  description = Cleaning directory $object_dir
+
+

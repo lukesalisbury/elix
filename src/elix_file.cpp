@@ -1,5 +1,21 @@
+/***********************************************************************************************************************
+ Copyright (c) Luke Salisbury
+ This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held
+ liable for any damages arising from the use of this software.
+
+ Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter
+ it and redistribute it freely, subject to the following restrictions:
+
+ 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software.
+	If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is
+	not required.
+ 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original
+	software.
+ 3. This notice may not be removed or altered from any source distribution.
+***********************************************************************************************************************/
+
 #include "elix_file.hpp"
-#include "stretchy_buffer.h"
+//#include "stretchy_buffer.h"
 
 inline file_size elix_file__update_length(elix_file * file) {
 	file_offset pos = elix_file_offset(file);
@@ -71,6 +87,31 @@ size_t elix_file_read(elix_file * file, data_pointer buffer, size_t data_size, s
 
 }
 
+size_t elix_file_read_line( elix_file * file, char * string, size_t string_size) {
+	if ( !file || !file->handle || file->length < 1 ) {
+		return 0;
+	}
+
+	uint8_t value = 0;
+	file_size pos = elix_file_tell(file);
+	size_t read_counter = 0;
+	while ( file->length > pos && read_counter < string_size ) {
+		fread( &value, sizeof(uint8_t), 1, FH(file->handle) );
+		if ( feof( FH(file->handle) ) == 0 || value == 0 ) {
+			return read_counter;
+		} else if ( value == 10 ) {
+			return read_counter;
+		} else {
+			string[read_counter] = value;
+			read_counter++;
+		}
+		
+		pos++;
+	}
+	string[read_counter] = 0;
+	return read_counter;
+}
+/*
 size_t elix_file_readline( elix_file * file, char * string) {
 	if ( !file || !file->handle || file->length < 1 ) {
 		return 0;
@@ -92,7 +133,7 @@ size_t elix_file_readline( elix_file * file, char * string) {
 	}
 	return stb_sb_count(string);
 }
-
+*/
 
 file_offset elix_file_scan( elix_file * file, file_offset startPostion, uint8_t * needle, uint16_t needleLength ) {
 	file_offset position = -1;
@@ -133,5 +174,13 @@ file_offset elix_file_scan( elix_file * file, file_offset startPostion, uint8_t 
 
 	elix_file_seek(file, 0);
 	return position;
+}
+
+size_t elix_file_write( elix_file * file, data_pointer data, size_t size ) {
+	if ( !file || !file->handle ) {
+		return 0;
+	}
+	return fwrite(data, size, 1, FH(file->handle));
+
 }
 

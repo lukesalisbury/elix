@@ -1,7 +1,23 @@
+/***********************************************************************************************************************
+ Copyright (c) Luke Salisbury
+ This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held
+ liable for any damages arising from the use of this software.
+
+ Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter
+ it and redistribute it freely, subject to the following restrictions:
+
+ 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software.
+	If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is
+	not required.
+ 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original
+	software.
+ 3. This notice may not be removed or altered from any source distribution.
+***********************************************************************************************************************/
+
 #include "elix_html.hpp"
 #include <codecvt>
 #include <locale>
-
+#include <cstring>
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
 namespace elix {
@@ -47,6 +63,11 @@ namespace elix {
 		}
 		text++;
 		return char32;
+	}
+
+
+	namespace css {
+		
 	}
 
 	/*
@@ -317,7 +338,7 @@ namespace elix {
 								} else if ( doesStringMatch(char32.value, comment_next, cdata_start, comment_next.state)) {
 								} else {
 									state = STATECHANGE(PARSE_ERROR, d);
-									printf("Error Parsing <! Tag at char %zu\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, ' ' );
+									printf("Error Parsing <! Tag at char "pZU "\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, ' ' );
 									return current;
 								}
 							} else if ( comment_next.state == PARSE_SCAN_COMMENT && doesStringMatch(char32.value, comment_next, comment_start, state) ) {
@@ -328,7 +349,7 @@ namespace elix {
 								scan_next = reset_parse_next_info;
 							} else {
 								state = STATECHANGE(PARSE_ERROR, d);
-								printf("Error Parsing <! Tag at char %zu\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, '-' );
+								printf("Error Parsing <! Tag at char " pZD "\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, '-' );
 								return current;
 							}
 							comment_next.index++;
@@ -418,12 +439,50 @@ namespace elix {
 				printf("No Root Node found\n");
 			}
 		}
+
+		uint8_t build_rendertree_item(elix::html::node &node, elix_rendertree_item *& item, elix_rendertree_item * parent) {
+
+			node_object * obj = node.get();
+			if (obj->type) {
+				if ( item == nullptr )
+					item = new elix_rendertree_item;
+
+				switch (obj->type) {
+					case ELEMENT_RAWTEXT:
+						item->render_style.backgroundColour.hex = 0x00;
+						item->data = &obj->textContent;
+						item->data_type = ERTD_STRING;
+						break;
+					case ELEMENT_NORMAL:
+						item->data_type = ERTD_STRING;
+						break;
+					default:
+						item->data_type = ERTD_EMPTY;
+						break;
+				}
+
+				for (elix::html::node q: obj->children) {
+					elix_rendertree_item * subitem = new elix_rendertree_item;
+					build_rendertree_item(q, subitem, item);
+					item->children.push_back(subitem);
+				}
+
+				return 0;
+			}
+
+			return 1;
+		}
+
+		void update_render_tree(elix::html::node * node, elix_rendertree & tree) {
+			
+		}
+
 		elix_rendertree get_render_tree(document * doc) {
 
 			if (doc->root.get()->type) {
-
+				build_rendertree_item(doc->root, doc->rendertree.root, nullptr);
 			} else {
-
+				printf("No Root Node found\n");
 			}
 
 			return doc->rendertree;

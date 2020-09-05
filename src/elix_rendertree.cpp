@@ -16,10 +16,50 @@ it and redistribute it freely, subject to the following restrictions:
 #include "elix_rendertree.hpp"
 #include "elix_rgbabuffer.hpp"
 
+#include <string>
+
+uint32_t elix_rendertreeitem_to_rgbabuffer(elix_rendertree_item * item, rbgabuffer_context * ctx) {
+
+	switch (item->data_type) {
+		case ERTD_STRING:
+			//std::string *str = static_cast<std::string *>(item->data);
+			rbgabuffer_FillColor(ctx, item->render_style.colour.hex);
+			rbgabuffer_fillText(ctx, "Hello World", 10, 16, 500);
+			break;
+
+		case ERTD_EMPTY:
+			break;
+		case ERTD_IMAGE:
+			break;
+		case ERTD_EXTERNAL:
+			break;
+		case ERTD_COUNT:
+		case ERTD_UPDATE:
+		break;
+		default:
+			rbgabuffer_BeginPath(ctx);
+			rbgabuffer_MoveTo(ctx, item->render_style.x, item->render_style.y);
+			rbgabuffer_LineTo(ctx, item->render_style.x + item->render_style.width, item->render_style.y);
+			rbgabuffer_LineTo(ctx, item->render_style.x + item->render_style.width, item->render_style.y + item->render_style.height);
+			rbgabuffer_LineTo(ctx, item->render_style.x, item->render_style.y + item->render_style.height);
+			rbgabuffer_FillColor(ctx, item->render_style.backgroundColour.hex);
+			rbgabuffer_Fill(ctx);
+			break;
+	}
+
+	
+	for(elix_rendertree_item * child : item->children) {
+		elix_rendertreeitem_to_rgbabuffer(child, ctx);
+	}
+
+	return 0;
+}
 uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all) {
 	ASSERT(tree);
 	ASSERT(ctx);
 	if ( tree->root ) {
+		elix_rendertreeitem_to_rgbabuffer(tree->root, ctx);
+		
 
 	}
 

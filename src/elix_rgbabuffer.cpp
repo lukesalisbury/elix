@@ -20,14 +20,15 @@ struct rgbabuffer_active_edge_index {
 
 struct rgbabuffer_font {
 	stbtt_fontinfo info;
+	elix_databuffer data;
 	float scale, baseline;
 	int base_ascent, base_descent, base_line_gap;
 };
 
 
-uint32_t rbgabuffer_get_pixel(rbgabuffer_context * ctx, int32_t x , int32_t y) {
+uint32_t rbgabuffer_get_pixel(rbgabuffer_context * ctx, uint32_t x , uint32_t y) {
 
-	if (x >= 0 && y >= 0 && (uint32_t)x < ctx->memory->width && (uint32_t)y < ctx->memory->height ) {
+	if (x < ctx->memory->width && y < ctx->memory->height ) {
 		return ctx->memory->pixels[ x + (y*ctx->memory->width)];
 	}
 	return 0xDEADC0DE;
@@ -571,7 +572,6 @@ void rbgabuffer_Stroke(rbgabuffer_context* ctx) {
 	ctx->commands.index = 0;
 }
 
-
 void rbgabuffer_FillColor(rbgabuffer_context* ctx, uint32_t color) {
 	ctx->fill_colour = color;
 }
@@ -594,75 +594,43 @@ void rbgabuffer_LineTo(rbgabuffer_context* ctx, float x, float y) {
 	rbgabuffer__appendCommands(ctx, vals, ARRAYCOUNT(vals));
 }
 
-rgbabuffer_font * rbgabuffer__loadFont(rbgabuffer_context* ctx, const char * fontName) {
+
+
+#include "elix_os.hpp"
+
+
+rgbabuffer_font * rbgabuffer__unloadFont(rbgabuffer_context* ctx, rgbabuffer_font *& font) {
+	elix_databuffer_free(&font->data);
+	NULLIFY(font);
+	return font;
+}
+
+rgbabuffer_font * rbgabuffer__loadFont(rbgabuffer_context* ctx, const char * font_name) {
 	rgbabuffer_font * font = nullptr;
-	elix_file raw_file;
+	elix_databuffer raw_file;
 
-	//TODO: Cross platform support
-	char * font_filename;
-	if (!fontName) {
-		font_filename = "c:/windows/fonts/seguiemj.ttf";
-	} else {
-		font_filename = "c:/windows/fonts/arial.ttf";
-	}
-
-	if ( elix_file_open(&raw_file, font_filename) ) {
-		file_size size= 0;
-		uint8_t * file_content = elix_file_read_content(&raw_file, size);
+	raw_file = elix_os_font(font_name);
+	if ( raw_file.size ) {
 		font = new rgbabuffer_font();
-		stbtt_InitFont(&font->info, file_content, stbtt_GetFontOffsetForIndex(file_content,0));
-		stbtt_GetFontVMetrics(&font->info, &font->base_ascent, &font->base_descent, &font->base_line_gap);
+		font->data = raw_file;
+		int index = stbtt_GetFontOffsetForIndex(raw_file.data, 0);
+		if ( index != -1 ) {
+			stbtt_InitFont(&font->info, raw_file.data, index);
+			stbtt_GetFontVMetrics(&font->info, &font->base_ascent, &font->base_descent, &font->base_line_gap);
 	}
-	elix_file_close(&raw_file);
+	}
+
+	//elix_databuffer_free(&raw_file);
+
 	return font;
 }
 
 
-uint32_t elix_cstring_next_character(char *& object) {
-	uint8_t single = *object;
-	uint32_t cchar = single;
-	if ( cchar <= 128 )	{
-
-	} else if ( cchar < 224 ) {
-		object++;
-		uint32_t next = *object;
-
-		cchar = ((cchar << 6) & 0x7ff) + (next & 0x3f);
-	} else if ( cchar < 240 )	{
-		uint32_t next;
-
-		object++;
-		next = (*object) & 0xff;
-		cchar = ((cchar << 12) & 0xffff) + ((next << 6) & 0xfff);
-
-		object++;
-		next = (*object) & 0x3f;
-		cchar += next;
-	}	else if ( cchar < 245 )	{
-		uint32_t next;
-
-		object++;
-		next = (*object) & 0xff;
-		cchar = ((cchar << 18) & 0xffff) + ((next << 12) & 0x3ffff);
-
-		object++;
-		next = (*object) & 0xff;
-		cchar += (next << 6) & 0xfff;
-
-		object++;
-		next = (*object) & 0x3f;
-		cchar += next;
-	}
-	object++;
-	return cchar;
-}
-
-uint32_t elix_cstring_peek_character(char * object) {
-	return elix_cstring_next_character(object);
-}
 
 void rgbabuffer__fillChar(rbgabuffer_context* ctx, rgbabuffer_font * font, uint32_t character, float &x, float &y,uint32_t next_character) {
-
+	if ( !font || !font->info.numGlyphs) {
+		return;
+	}
 	int index = stbtt_FindGlyphIndex(&font->info, character);
 	if (character > 127 && !index) {
 		printf("non-ascii %d %d\n", character, index);
@@ -671,11 +639,11 @@ void rgbabuffer__fillChar(rbgabuffer_context* ctx, rgbabuffer_font * font, uint3
 	if ( index ) {
 		float scale = stbtt_ScaleForPixelHeight(&font->info, ctx->font_size_px);
 		float baseline = (font->base_ascent * scale);
-		int advance_width, width, height, xoff, yoff;
+		int advance_width, left_sidebearing,width, height, xoff, yoff;
 
 		uint8_t * bitmap = stbtt_GetGlyphBitmap(&font->info, 0, scale, index, &width, &height, &xoff, &yoff);
 
-		stbtt_GetGlyphHMetrics(&font->info, character, &advance_width, nullptr);
+		stbtt_GetGlyphHMetrics(&font->info, character, &advance_width, &left_sidebearing);
 
 		for ( int32_t j = 0; j < height; ++j) {
 			for ( int32_t i = 0; i < width; ++i) {
@@ -694,10 +662,13 @@ void rgbabuffer__fillChar(rbgabuffer_context* ctx, rgbabuffer_font * font, uint3
 	}
 }
 
-
+#include "elix_cstring.hpp"
 
 void rbgabuffer_fillText(rbgabuffer_context* ctx, const char * text, float x, float y, float maxWidth) {
-	rgbabuffer_font * font = rbgabuffer__loadFont(ctx, "arial");
+	rgbabuffer_font * font = rbgabuffer__loadFont(ctx, "Sans-Serif");
+	if ( !font ) {
+		return;
+	}
 
 	char * object = (char*)text;
 	uint32_t current_character = 0, next_character = 0;
