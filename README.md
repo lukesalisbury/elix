@@ -89,7 +89,3 @@ Force the use of SDL2 instead of the native platform code.
 Built-ins LOG_+ functions do not print anything.
 
 
-
-
-
-
