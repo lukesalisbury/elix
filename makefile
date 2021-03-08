@@ -80,7 +80,7 @@ ninja_build="$(BUILD_DIRECTORY)/$(PLATFORM_NAME)/build.ninja"
 ${shell $(command_mkdir) $(BUILD_DIRECTORY)/$(PLATFORM_NAME) }
 
 #Build
-.PHONY: clean options info
+.PHONY: clean options info build
 
 include scripts/settings/options.mk
 include scripts/modules/*.mk
@@ -97,7 +97,7 @@ clean:
 	$(command_remove) $(ninja_config)
 	$(command_remove) $(command_write)
 
-info: 
+info:
 	@echo --------------------------------
 	@echo Creating Ninja Build Scripts
 	@echo Building on: $(BUILD_PLATFORM)
@@ -150,3 +150,6 @@ debug: info config file
 release: info config file
 	${shell $(command_write) "compile_mode=release" >> $(ninja_config)}
 	${shell $(command_write) "platform_defines=$(PLATFORM_DEFINES)" >> $(ninja_config)}
+
+build:
+	ninja

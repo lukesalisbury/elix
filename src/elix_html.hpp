@@ -73,7 +73,7 @@ namespace elix {
 		elix::html::status parse(elix::html::document & doc, elix::html::status * lastStatus = nullptr);
 		elix::html::document open(std::string content);
 		void print(document * doc);
-		elix_rendertree get_render_tree(document * doc);
+		elix_rendertree get_render_tree(document * doc, elix_uv32_2 dimension);
 
 	}
 }

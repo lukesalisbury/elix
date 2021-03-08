@@ -55,7 +55,7 @@ file_offset elix_file_offset(elix_file * file) {
 
 bool elix_file_at_end(elix_file * file) {
 	if ( file->handle ) {
-		if ( file->pos == file->length )
+		if ( file->pos >= file->length )
 			return true;
 		return !(feof( FH(file->handle) ) == 0);
 	}

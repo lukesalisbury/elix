@@ -246,7 +246,7 @@ namespace elix {
 								comment_next = reset_parse_next_info;
 							} else {
 								state = STATECHANGE(PARSE_ERROR, d);
-								printf("Error Parsing Tag at char %zu\n", current.offset);
+								printf("Error Parsing Tag at char " pZU "\n", current.offset);
 								return current;
 							}
 							break;
@@ -338,7 +338,7 @@ namespace elix {
 								} else if ( doesStringMatch(char32.value, comment_next, cdata_start, comment_next.state)) {
 								} else {
 									state = STATECHANGE(PARSE_ERROR, d);
-									printf("Error Parsing <! Tag at char "pZU "\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, ' ' );
+									LOG_MESSAGE("Error Parsing <! Tag at char " pZU "\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, ' ' );
 									return current;
 								}
 							} else if ( comment_next.state == PARSE_SCAN_COMMENT && doesStringMatch(char32.value, comment_next, comment_start, state) ) {
@@ -349,7 +349,7 @@ namespace elix {
 								scan_next = reset_parse_next_info;
 							} else {
 								state = STATECHANGE(PARSE_ERROR, d);
-								printf("Error Parsing <! Tag at char " pZD "\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, '-' );
+								LOG_MESSAGE("Error Parsing <! Tag at char " pZD "\n%s\n%*c^\n", current.offset, doc.reference.substr( current.offset < 4 ? 0 :current.offset - 4, 8).c_str(), current.offset < 4 ? current.offset-1 : 3, '-' );
 								return current;
 							}
 							comment_next.index++;
@@ -477,7 +477,7 @@ namespace elix {
 			
 		}
 
-		elix_rendertree get_render_tree(document * doc) {
+		elix_rendertree get_render_tree(document * doc, elix_uv32_2 dimension) {
 
 			if (doc->root.get()->type) {
 				build_rendertree_item(doc->root, doc->rendertree.root, nullptr);

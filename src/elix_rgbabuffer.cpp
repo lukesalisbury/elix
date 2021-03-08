@@ -726,7 +726,7 @@ rbgabuffer_context * rbgabuffer_create_context(elix_graphic_data * external_buff
 
 		rbgabuffer__gridpattern(context->memory);
 	}
-
+	context->dimensions = requested_dimensions;
 	context->commands.max = 32;
 	context->commands.array = (float*)malloc( sizeof(float)*context->commands.max);
 

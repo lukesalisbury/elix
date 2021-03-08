@@ -8,7 +8,7 @@
 			"name": "Debug",
 			"type": "cppdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/bin/filetransfer-debug-windows-x86_64.exe",
+			"program": "${workspaceFolder}/bin/test-debug-windows-x86_64.exe",
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
@@ -23,7 +23,7 @@
 				}
 			],
 			"preLaunchTask": "Build",
-			"miDebuggerPath": "C:/dev/mingw-w64/mingw64/bin/gdb.exe"
+			"miDebuggerPath": "C:/dev/TDM-GCC-64/bin/gdb.exe"
 		}
 	]
 }

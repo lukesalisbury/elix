@@ -10,6 +10,7 @@
 #include "elix_os.hpp"
 
 
+
 static elix_fpscounter fps;
 static elix_program_info program_info;
 
@@ -74,6 +75,7 @@ void test_elix_rendertree() {
 	LOG_MESSAGE("--------------------------------------------------------");
 	LOG_MESSAGE("--- Elix Rendertree ------------------------------------");
 
+
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
@@ -112,7 +114,7 @@ void test_elix_html() {
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
-	elix_rendertree tree = elix::html::get_render_tree(&html);
+	elix_rendertree tree = elix::html::get_render_tree(&html, bitmap_context->dimensions);
 	elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
 	while(elix_os_window_handle_events(w) ) {
 		if ( w->flags & EOE_WIN_CLOSE ) {
@@ -240,9 +242,9 @@ void test_elix_cstring() {
 	const char sanitisedTestA[] = "asdfhg8dhfjk459fg9kxfgf-78546fdsgl][.";
 
 	LOG_MESSAGE("Sanitise");
-	LOG_MESSAGE("Before: %s length:%zu", testA, elix_cstring_length(testA));
+	LOG_MESSAGE("Before: %s length:" pZU "", testA, elix_cstring_length(testA));
 	elix_cstring_sanitise(testA);
-	LOG_MESSAGE(" After: %s length:%zu", testA, elix_cstring_length(testA));
+	LOG_MESSAGE(" After: %s length:" pZU "", testA, elix_cstring_length(testA));
 
 	if ( !elix_cstring_equal(testA,sanitisedTestA) ) {
 		LOG_MESSAGE("String is not sanitised.");
@@ -250,6 +252,9 @@ void test_elix_cstring() {
 
 	LOG_MESSAGE("has_suffix(\"adsadsadas\", \"das\"): %d", elix_cstring_has_suffix("adsadsadas", "das"));
 	LOG_MESSAGE("has_suffix(\"adsadsadas\", \"qdas\"): %d", elix_cstring_has_suffix("adsadsadas", "qdas"));
+
+	LOG_MESSAGE("elix_cstring_find_of(\"asdfhg8dhfjk459fg9kxfgf\", \"dhf\"): %d", elix_cstring_find_of("asdfhg8dhfjk459fg9kxfgf", "dhf"));
+
 
 	char * leftsub = nullptr, * leftnegsub = nullptr,* midsub = nullptr, * midnegsub = nullptr, * rightsub = nullptr, * rightnegsub = nullptr;
 
@@ -262,14 +267,14 @@ void test_elix_cstring() {
 
 
 	LOG_MESSAGE("String Used: %s", testB); // 18
-	LOG_MESSAGE("Left Substr: %s [%zu:%d] from %d", leftsub, elix_cstring_length(leftsub), 13, 5);
-	LOG_MESSAGE("Left with negSubstr: %s [%zu:%d] from %d", leftnegsub,elix_cstring_length(leftnegsub), 5,  -5);
-	LOG_MESSAGE("Mid Substr: %s [%zu:%d] from %d with length %d", midsub, elix_cstring_length(midsub),5,  2, 5);
-	LOG_MESSAGE("Mid with neg Substr: %s [%zu:%d] from %d with length %d", midnegsub, elix_cstring_length(midnegsub),14, 2, -2);
-	LOG_MESSAGE("Right Substr: %s [%zu:%d] from %d with length %d", rightsub, elix_cstring_length(rightsub),10, 0, 10);
-	LOG_MESSAGE("right with neg Substr: %s [%zu:%d] from %d with length %d", rightnegsub,  elix_cstring_length(rightnegsub),8, 0, -10);
+	LOG_MESSAGE("Left Substr: %s [" pZU ":%d] from %d", leftsub, elix_cstring_length(leftsub), 13, 5);
+	LOG_MESSAGE("Left with negSubstr: %s [" pZU ":%d] from %d", leftnegsub,elix_cstring_length(leftnegsub), 5,  -5);
+	LOG_MESSAGE("Mid Substr: %s [" pZU ":%d] from %d with length %d", midsub, elix_cstring_length(midsub),5,  2, 5);
+	LOG_MESSAGE("Mid with neg Substr: %s [" pZU ":%d] from %d with length %d", midnegsub, elix_cstring_length(midnegsub),14, 2, -2);
+	LOG_MESSAGE("Right Substr: %s [" pZU ":%d] from %d with length %d", rightsub, elix_cstring_length(rightsub),10, 0, 10);
+	LOG_MESSAGE("right with neg Substr: %s [" pZU ":%d] from %d with length %d", rightnegsub,  elix_cstring_length(rightnegsub),8, 0, -10);
 
-
+	
 }
 
 void test_elix_program() {
@@ -357,7 +362,7 @@ void test_elix_package() {
 	delete puttris;
 
 	after = elix_os_memory_usage();
-	LOG_MESSAGE("Memory Usage: Before: %zu, After: %zu, Diff: %zu", before, after, after - before);
+	LOG_MESSAGE("Memory Usage: Before: " pZU ", After: " pZU ", Diff: " pZU, before, after, after - before);
 }
 
 
@@ -486,12 +491,12 @@ void test_directory_watch() {
 void test_run( const char* name, void (*test)() ) {
 	if ( test ) {
 		struct timespec start, end;
-		clock_gettime(CLOCK_MONOTONIC, &start );
+		//clock_gettime(CLOCK_MONOTONIC, &start );
 		test();
-		clock_gettime(CLOCK_MONOTONIC, &end );
+		//clock_gettime(CLOCK_MONOTONIC, &end );
 
-		double elapse = difftime(end.tv_sec, start.tv_sec) + ((double)(end.tv_nsec - start.tv_nsec)/1.0e9);
-		NAMEDLOG_MESSAGE(name, "--- Took: %f ------------------------------------------", elapse);
+		//double elapse = difftime(end.tv_sec, start.tv_sec) + ((double)(end.tv_nsec - start.tv_nsec)/1.0e9);
+		//NAMEDLOG_MESSAGE(name, "--- Took: %f ------------------------------------------", elapse);
 	}
 }
 
@@ -506,7 +511,7 @@ int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 	program_info = elix_program_info_create(argv[0], "Elix Test Program", "0.4", nullptr);
 	//test_run("Program Info", &test_elix_program);
 	//test_run("Endian", &test_elix_endian);
-	test_run("Rendertree", &test_elix_rendertree);
+	//test_run("Rendertree", &test_elix_html);
 	//test_run("Hash table", &test_elix_hash);
 
 	//test_run("CANVAS", &test_elix_os_window);
@@ -520,7 +525,7 @@ int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 
 	//test_elix_os_directory();
 	//test_elix_package();
-
+LOG_MESSAGE("elix_cstring_find_of(\"asdfhg8dhfjk459fg9kxfgf\", \"dhf\"): %d", elix_cstring_find_of("asdfhg8dhfjk459fg9kxfgf", "dhf"));
 	return 0;
 }
 

@@ -24,6 +24,29 @@
 				"kind": "build",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "Clean",
+			"type": "shell",
+			"linux": {
+				"options": {
+					"cwd": "${workspaceFolder}/"
+				},
+				"command": "ninja",
+				"args": "clean"
+
+			},
+			"windows": {
+				"options": {
+					"cwd": "${workspaceFolder}/"
+				},
+				"command": "c:/dev/ninja ",
+				"args": ["clean","2>&1"]
+			},
+			"problemMatcher": ["$gcc"],
+			"group": "build"
+				
+			
 		}
 	]
 }

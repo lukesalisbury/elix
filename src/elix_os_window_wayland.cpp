@@ -1,3 +1,12 @@
+
+/*
+xdg-shell-client-protocol.h:
+	$(WAYLAND_SCANNER) client-header $(XDG_SHELL_PROTOCOL) xdg-shell-client-protocol.h
+
+xdg-shell-protocol.c:
+	$(WAYLAND_SCANNER) private-code $(XDG_SHELL_PROTOCOL) xdg-shell-protocol.c
+
+*/
 #include "elix_os_window.hpp"
 #include "elix_os_window_wayland.hpp"
 #include <wayland-egl.h>

@@ -23,7 +23,6 @@ struct elix_os_window_common {
 struct elix_os_opengl;
 struct elix_os_window;
 
-
 #if defined PLATFORM_WINDOWS
 	#include "elix_os_window_win.hpp"
 #elif defined PLATFORM_LINUX
@@ -32,7 +31,6 @@ struct elix_os_window;
 	#include "elix_os_window_3ds.hpp"
 #else
 	#error "Unsupported platform"
-
 #endif
 
 elix_os_window * elix_os_window_create( elix_uv32_2 dimension, elix_uv16_2 scale = {1,1}); //Todo: Add Extra options

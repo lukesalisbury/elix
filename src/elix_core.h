@@ -40,7 +40,7 @@
 #define TAU32 6.28318530717958647692f
 #define DEG2RAD(a) a * 0.01745329251994329576923690768489f
 
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_WINDOWS) && defined(COMPILER_MSCV)
 #define pZD "%Id"
 #define pZX "%Ix"
 #define pZU "%Iu"

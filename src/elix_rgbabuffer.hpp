@@ -110,6 +110,8 @@ struct rbgabuffer_pattern {
 struct rbgabuffer_context {
 	elix_graphic_data * memory;
 	uint8_t internal_buffer; //Note: Owned by this
+	elix_uv32_2 dimensions = { 0, 0};
+
 
 	rgbabuffer_font * emoji = nullptr;
 	rbgabuffer_command_array commands;

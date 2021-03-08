@@ -111,8 +111,9 @@ size_t elix_cstring_find_not_of( const char * str, const char * search, size_t o
 	for (size_t c = offset; c < length && str[c] != 0; c++) {
 		bool found = false;
 		for (size_t sc = 0; sc <= sl; sc++) {
-			if ( str[c] == search[sc]) {
-				found = true;
+			if ( str[c+sc] == search[sc]) {
+				found = (sc == sl-1);
+			} else {
 				break;
 			}
 		}
@@ -125,18 +126,56 @@ size_t elix_cstring_find_not_of( const char * str, const char * search, size_t o
 size_t elix_cstring_find_of(const char * str, const char * search, size_t offset) {
 	size_t length = elix_cstring_length(str);
 	size_t sl = elix_cstring_length(search);
-	for (size_t c = offset; c < length && str[c] != 0; c++) {
-		for (size_t sc = 0; sc <= sl; sc++) {
-			if ( str[c] == search[sc]) {
-				return c;
+	for (size_t c = offset; c < length - sl && str[c] != 0; c++) {
+		bool found = false;
+		for (size_t sc = 0; sc < sl; sc++) {
+			if ( str[c+sc] == search[sc]) {
+				found = (sc == sl-1);
+			} else {
 				break;
 			}
 		}
+		if ( found )
+			return c;
 	}
 	return SIZE_MAX;
 }
 
+size_t elix_cstring_inreplace( char * source, size_t buffer_size, const char *search, const char *replace) {
+	//NOTE: This is slow, and not a good implemenation
+	//TODO: Check for overflow
+	size_t search_len = 0, replace_len = 0, diff_len = 0;
+	size_t source_len = elix_cstring_length(source, 1);
+	size_t pos = elix_cstring_find_of(source, search, 0);
+	if ( pos != SIZE_MAX ) {
+		search_len = elix_cstring_length(search, 0);
+		replace_len = elix_cstring_length(replace, 0);
+		diff_len = search_len - replace_len;
 
+		size_t l = 0;
+		if ( diff_len > 0 ) {
+			for (size_t i = pos; i < source_len && i+diff_len < buffer_size ; l++,i++) {
+				if ( l < replace_len ) {
+					source[i] = replace[l];
+				} else {
+					source[i] = source[i+diff_len];
+				}
+			}
+		} else {
+			if ( diff_len < 0 ) {
+				for (size_t i = source_len; i < pos+search_len; i--) {
+					source[i] = source[i+diff_len];
+				}
+			}
+			for (size_t i = pos; i < source_len; l++,i++) {
+				source[i] = replace[l];
+			}
+		}
+
+	
+	}
+	return diff_len;
+}
 void elix_cstring_sanitise( char * string ) {
 	size_t pos = 0;
 	size_t length = elix_cstring_length(string, 1);

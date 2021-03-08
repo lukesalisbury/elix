@@ -58,9 +58,13 @@ uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_contex
 	ASSERT(tree);
 	ASSERT(ctx);
 	if ( tree->root ) {
+		LOG_MESSAGE("Buffer Size %zdx%zd", ctx->dimensions.width, ctx->dimensions.height);
+
 		elix_rendertreeitem_to_rgbabuffer(tree->root, ctx);
 		
 
+	} else {
+		LOG_ERROR("No Render Tree to render");
 	}
 
 	return 0;

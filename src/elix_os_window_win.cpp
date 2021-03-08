@@ -134,7 +134,8 @@ elix_os_window * elix_os_window_create(elix_uv32_2 dimension, elix_uv16_2 scale)
 	win->instance_handle = GetModuleHandle( nullptr );
 	win->width = dimension.width;
 	win->height = dimension.height;
-
+	win->dimension.width = dimension.width/scale.x;
+	win->dimension.height = dimension.height/scale.y;
 	win->display_buffer = elix_graphic_data_create({{dimension.width/scale.x, dimension.height/scale.y}});
 	memset(win->display_buffer->pixels, 0xFFEEEEEE, win->display_buffer->pixel_count);
 
