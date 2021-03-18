@@ -67,7 +67,7 @@ Simple windows creation and event handling. Currently Windows and Wayland
 * HTTP Server
 * Tree Node Render
 * OS Integration/File Association
-
+* SSL
 
 
 
@@ -89,3 +89,11 @@ Force the use of SDL2 instead of the native platform code.
 Built-ins LOG_+ functions do not print anything.
 
 
+
+
+
+
+##Platform Nots
+### Wayland
+wayland-scanner private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml include/wayland/xdg-shell-protocol.c
+wayland-scanner client-header /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml include/xdg-shell-client-protocol.h

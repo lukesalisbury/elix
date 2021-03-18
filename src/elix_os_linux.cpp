@@ -71,6 +71,7 @@ elix_file * elix_platform_font( char * font_name ) {
 
 void elix_os_system_idle(uint32_t time)
 {
+	
 }
 
 #endif

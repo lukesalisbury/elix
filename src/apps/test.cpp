@@ -514,7 +514,7 @@ int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 	//test_run("Rendertree", &test_elix_html);
 	//test_run("Hash table", &test_elix_hash);
 
-	//test_run("CANVAS", &test_elix_os_window);
+	test_run("CANVAS", &test_elix_os_window);
 
 	//test_run("Directory Watcher", &test_directory_watch);
 	//test_elix_rgbabuffer();
@@ -525,7 +525,7 @@ int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 
 	//test_elix_os_directory();
 	//test_elix_package();
-LOG_MESSAGE("elix_cstring_find_of(\"asdfhg8dhfjk459fg9kxfgf\", \"dhf\"): %d", elix_cstring_find_of("asdfhg8dhfjk459fg9kxfgf", "dhf"));
+
 	return 0;
 }
 

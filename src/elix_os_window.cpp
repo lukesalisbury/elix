@@ -8,7 +8,6 @@
 
 #elif defined PLATFORM_SDL2
 
-
 #else
 	#error "Unsupported platform"
 #endif

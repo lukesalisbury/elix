@@ -5,7 +5,7 @@ compiler = gcc
 binary_prefix = bin/
 binary_suffix = -${compile_mode}-${platform_ninja}
 
-platform_lib = -lstdc++ -lpthread -lm ${platform_lib}
+platform_lib = -lstdc++ -lpthread -lm -lwayland-client ${platform_lib}
 platform_lib_flags = -std=c++11 -pthread ${platform_lib_flags}
 
 platform_includes= -I"src/platform/${platform_subsystem}" ${platform_includes}

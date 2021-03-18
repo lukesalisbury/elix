@@ -2,8 +2,13 @@
 
 
 config_local: config_header
-	@echo --------------------------------
-ifeq ($(BUILDPLATFORM), windows)
+	@echo ----------- $(BUILD_PLATFORM) -------------
+ifeq ($(BUILD_PLATFORM), Linux)
+	@echo ---- Wayland -----
+	${shell ./scripts/platform/linux-common.sh}
+endif
+
+ifeq ($(BUILD_PLATFORM), windows)
 #	${shell $(writecommand) "platform_includes=-I\"$(SUPPORTPATH)/include\" " >> $(configninja)}
 #	${shell $(writecommand) "platform_lib_flags=-L\"$(SUPPORTPATH)/lib\"" >> $(configninja)}
 else

@@ -26,6 +26,7 @@
 #elif defined PLATFORM_LINUX
 	#include "elix_os_directory_posix.cpp"
 	#include "elix_os_linux.cpp"
+	
 #elif defined PLATFORM_3DS
 	#include "elix_os_directory_posix.cpp"
 #elif defined PLATFORM_NXSWITCH

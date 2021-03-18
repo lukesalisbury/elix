@@ -141,12 +141,13 @@ size_t elix_cstring_find_of(const char * str, const char * search, size_t offset
 	return SIZE_MAX;
 }
 
-size_t elix_cstring_inreplace( char * source, size_t buffer_size, const char *search, const char *replace) {
+size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const char *search, const char *replace) {
 	//NOTE: This is slow, and not a good implemenation
 	//TODO: Check for overflow
-	size_t search_len = 0, replace_len = 0, diff_len = 0;
-	size_t source_len = elix_cstring_length(source, 1);
-	size_t pos = elix_cstring_find_of(source, search, 0);
+	size_t search_len = 0, replace_len = 0;
+	ssize_t diff_len = 0;
+	size_t source_len = elix_cstring_length(source_text, 1);
+	size_t pos = elix_cstring_find_of(source_text, search, 0);
 	if ( pos != SIZE_MAX ) {
 		search_len = elix_cstring_length(search, 0);
 		replace_len = elix_cstring_length(replace, 0);
@@ -154,21 +155,26 @@ size_t elix_cstring_inreplace( char * source, size_t buffer_size, const char *se
 
 		size_t l = 0;
 		if ( diff_len > 0 ) {
-			for (size_t i = pos; i < source_len && i+diff_len < buffer_size ; l++,i++) {
+			for (size_t i = pos; i < source_len; l++,i++) {
 				if ( l < replace_len ) {
-					source[i] = replace[l];
+					source_text[i] = replace[l];
 				} else {
-					source[i] = source[i+diff_len];
+					source_text[i] = source_text[i+diff_len];
 				}
 			}
 		} else {
+			if ( pos+search_len >= buffer_size) {
+				return 0;
+			}
 			if ( diff_len < 0 ) {
-				for (size_t i = source_len; i < pos+search_len; i--) {
-					source[i] = source[i+diff_len];
+				size_t j;
+				for (size_t i = source_len; i > pos+search_len; i--) {
+					j = i+diff_len;
+					source_text[i] = source_text[j];
 				}
 			}
-			for (size_t i = pos; i < source_len; l++,i++) {
-				source[i] = replace[l];
+			for (size_t i = pos; i < source_len && l < replace_len; l++,i++) {
+				source_text[i] = replace[l];
 			}
 		}
 
