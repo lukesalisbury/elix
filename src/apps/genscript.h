@@ -48,7 +48,8 @@ typedef int64_t file_offset;
 typedef enum {
 	EFF_STATUS_UNKNOWN = 1 << 0,
 	EFF_FILE_OPEN = 1 << 1, EFF_FILE_READ_ONLY = 1 << 2, EFF_FILE_READ_ERROR = 1 << 3 ,
-	EFF_FILE_WRITE = 1 << 4, EFF_FILE_WRITE_ERROR = 1 << 5, EFF_WRITABLE = 1 << 6
+	EFF_FILE_WRITE = 1 << 4, EFF_FILE_WRITE_ERROR = 1 << 5, EFF_WRITABLE = 1 << 6,
+	EFF_FILE_CREATE = 1 << 7
 } ElixFileFlag;
 
 struct ElixFile {
@@ -338,22 +339,20 @@ size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const cha
 				return 0;
 			}
 			if ( diff_len < 0 ) {
-				size_t j;
-				for (size_t i = source_len; i > pos+search_len; i--) {
-					j = i+diff_len;
-					source_text[i] = source_text[j];
+				size_t j = source_len-diff_len;
+				for (size_t i = source_len; i >= pos+search_len; i--) {
+					j = i-diff_len;
+					source_text[j] = source_text[i];
 				}
 			}
-			for (size_t i = pos; i < source_len && l < replace_len; l++,i++) {
+			for (size_t i = pos; i < buffer_size && l < replace_len; l++,i++) {
 				source_text[i] = replace[l];
 			}
 		}
 
-
 	}
 	return diff_len;
 }
-
 
 
 struct ElixPath {
@@ -489,4 +488,9 @@ size_t elix_file_write_string( elix_file * file, const char * string, size_t dat
 		data_size = elix_cstring_length(string, 0);
 	}
 	return fwrite(string, data_size, 1, FH(file->handle));
+}
+
+
+uint32_t elix_cstring_hash( const char * str ) {
+	return elix_hash(str, elix_cstring_length(str, 0));
 }

@@ -167,21 +167,21 @@ size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const cha
 				return 0;
 			}
 			if ( diff_len < 0 ) {
-				size_t j;
-				for (size_t i = source_len; i > pos+search_len; i--) {
-					j = i+diff_len;
-					source_text[i] = source_text[j];
+				size_t j = source_len-diff_len;
+				for (size_t i = source_len; i >= pos+search_len; i--) {
+					j = i-diff_len;
+					source_text[j] = source_text[i];
 				}
 			}
-			for (size_t i = pos; i < source_len && l < replace_len; l++,i++) {
+			for (size_t i = pos; i < buffer_size && l < replace_len; l++,i++) {
 				source_text[i] = replace[l];
 			}
 		}
 
-	
 	}
 	return diff_len;
 }
+
 void elix_cstring_sanitise( char * string ) {
 	size_t pos = 0;
 	size_t length = elix_cstring_length(string, 1);

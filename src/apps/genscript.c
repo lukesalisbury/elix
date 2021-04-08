@@ -1,3 +1,11 @@
+/*************************************************************************
+ * Generates build.ninja files for multiple platforms
+ * build: gcc genscript.c -o genscript.exe
+ * run: genscript.exe [-help]
+ * 
+ * 
+*************************************************************************/
+
 #include "genscript.h"
 
 
@@ -14,31 +22,35 @@ PLATFORM_BITS=$bits\n\
 -Wl,-rpath -Wl,\\$$ORIGIN/lib\n\
 ";
 
-static char config_default_text[1024] = "[options]\n\
-finaliser=strip\n\
+static char config_default_text[2048] = "[options]\n\
 compiler=$tripletgcc\n\
 linker=$tripletgcc\n\
 name=testapp\n\
+program_suffix=\n\
+[options-windows]\n\
 program_suffix=.exe\n\
-finalise_suffix=-strip.exe\n\
+[options-3ds]\n\
+finaliser=3dsxtool\n\
+program_suffix=.elf\n\
+finalise_suffix=.3dsx\n\
 [commands]\n\
-compile_cpp=$compiler $compiler_includes $compiler_flags -o $out -c $in\n\
-compile_c=$compiler $compiler_includes $compiler_flags -o $out -c $in\n\
-link_shared=$linker -shared $lib_flags $in -o $out $compiler_lib\n\
-link_static=$linker -static $lib_flags $in -o $out $compiler_lib\n\
-link=$linker $lib_flags $in -o $out $compiler_lib \n\
-finalise=$finaliser $finalise_flags $in -o $out\n\
+compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_flags} -o $out -c $in\n\
+compile_c=${compiler} ${compiler_includes} ${compller_defines}  ${compiler_flags} -o $out -c $in\n\
+link_shared=${linker} -shared ${compiler_lib_flags} $in -o $out ${compiler_lib} \n\
+link_static=${linker} -static ${compiler_lib_flags} $in -o $out ${compiler_lib}\n\
+link=${linker} ${compiler_lib_flags} $in -o $out ${compiler_lib} \n\
+finalise=${finaliser} ${finalise_flags} $in -o $out\n\
 clean=rm -rf ${object_dir}\n\
+[commands-3ds]\n\
+finalise=${finaliser} $in  $out  ${finalise_flags}\n\
 \n\
 ";
 
 	static char config_platform_text[512] = "[libs]\n\
 stdc++\n\
-pthread\n\
 m\n\
 [lib_flags]\n\
 -std=c++11\n\
--pthread\n\
 \n\
 [includes]\n\
 [flags]\n\
@@ -114,6 +126,18 @@ size_t find_configmap(ConfigMap * map, const char * key ) {
 	return SIZE_MAX;
 }
 
+void lookup_configmap(ConfigMap * map, uint32_t hash, size_t * position) {
+	if (  map->current > 0 && map->current < 64 ) {
+		for (size_t i = 0; i < map->current; i++) {
+			if ( map->hash[i] == hash ) {
+				*position = i;
+				return;
+			}
+		}
+	}
+
+}
+
 char * get_configmap(ConfigMap * map, const char * key) {
 	size_t index = find_configmap(map, key);
 	if ( index != SIZE_MAX && map->current < 64 ) {
@@ -122,18 +146,27 @@ char * get_configmap(ConfigMap * map, const char * key) {
 	return nullptr;
 }
 
-void push_configmap(ConfigMap * map, const char * data) {
+void push_configmap(ConfigMap * map, const char * data, uint8_t overwrite) {
 	if (  map->current < 64 ) {
+		size_t position = map->current;
 		size_t length = elix_cstring_length(data, 0);
 		size_t index = elix_cstring_find_of(data, "=", 0);
 		if ( !index || index == SIZE_MAX || index > length) {
 			index = length;
 		} else {
-			elix_cstring_append(map->value[map->current], 256, data + index + 1, length - index);
+			lookup_configmap(map, elix_hash(data, index), &position);
+			if ( overwrite ) {
+				map->value[position][0] = 0;
+			}
+			elix_cstring_append(map->value[position], 256, data + index + 1, length - index);
 		}
-		map->hash[map->current] = elix_hash(data, index);
-		elix_cstring_append(map->key[map->current], 256, data, index);
-		map->current++;
+
+		//New item
+		if ( position == map->current ) {
+			map->hash[position] = elix_hash(data, index);
+			elix_cstring_append(map->key[position], 256, data, index);
+			map->current++;
+		}
 	}
 }
 
@@ -147,11 +180,9 @@ void push_configlist(ConfigList * list, const char * data) {
 
 void find_plaform_details(CompilerInfo * info) {
 	uint32_t os = elix_hash(info->os, elix_cstring_length(info->os, 0));
-
-
 	switch (os)
 	{
-	case 0x6986d1e1: //#DS
+	case 0x6986d1e1: //3DS
 		elix_cstring_copy("arm-none-eabi-", info->triplet);
 		elix_cstring_copy("arm", info->arch);
 		elix_cstring_copy("32", info->bits);
@@ -267,6 +298,7 @@ uint64_t extension_ident( const char * extension ) {
 	return ident;
 }
 
+
 void update_string_from_compilerinfo( char * source_text, size_t source_size, CompilerInfo * target ) {
 	elix_cstring_inreplace(source_text, source_size, "$platform", target->os);
 	elix_cstring_inreplace(source_text, source_size, "$arch", target->arch);
@@ -346,35 +378,52 @@ void parse_txtcfg( const char * filename,  CurrentConfiguration * options, Compi
 	elix_file file = {0};
 	ConfigList * write_options = nullptr;
 	ConfigMap * write_map = nullptr;
+	char platform_option[64] = {0};
+	char commands_option[64] = {0};
+	snprintf(platform_option, 64, "[options-%s]", compiler->os);
+	snprintf(commands_option, 64, "[commands-%s]", compiler->os);
 	elix_file_open(&file, filename, EFF_FILE_READ_ONLY);
 	while (!elix_file_at_end(&file)) {
-		char data[256] = {};
+		char data[256] = {0};
 		elix_file_read_line(&file, data, 256);
 
 		if ( data[0] == '[') {
 			if ( elix_cstring_has_prefix(data,"[defines]") ) {
 				write_options = &options->defines;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[files]") ) {
 				write_options = &options->files;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[lib_flags]") ) {
 				write_options = &options->lib_flags;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[compiler_flags]") ) {
 				write_options = &options->flags;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[final_flags]") ) {
 				write_options = &options->final_flags;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[flags]") ) {
 				write_options = &options->flags;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[libs]") ) {
 				write_options = &options->libs;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[options]") ) {
+				write_options = nullptr;
+				write_map = &options->options;
+			} else if ( elix_cstring_has_prefix(data,platform_option) ) {
 				write_options = nullptr;
 				write_map = &options->options;
 			} else if ( elix_cstring_has_prefix(data,"[commands]") ) {
 				write_options = nullptr;
 				write_map = &options->commands;
+			} else if ( elix_cstring_has_prefix(data,commands_option) ) {
+				write_options = nullptr;
+				write_map = &options->commands;
 			} else {
 				write_options = nullptr;
-				write_map = &options->options;
+				write_map = nullptr;
 			}
 		} else if ( data[0] == '#') {
 		} else if ( data[0] < 32 ) {
@@ -384,8 +433,8 @@ void parse_txtcfg( const char * filename,  CurrentConfiguration * options, Compi
 			update_string_from_compilerinfo(data, 256, compiler);
 			if ( write_options ) {
 				push_configlist(write_options, data);
-			} else {
-				push_configmap(write_map, data);
+			} else if (write_map) {
+				push_configmap(write_map, data, 1);
 			}
 		}
 	}
@@ -442,15 +491,14 @@ void creeate_newproject(CompilerInfo * target) {
 	};
 
 
-	for (size_t i = 0; i < ARRAY_SIZE(directories_project); i++)
-	{
+	for (size_t i = 0; i < ARRAY_SIZE(directories_project); i++) {
 		LOG_INFO("Creating Directory:\t%s", directories_project[i]);
 		elix_os_directory_make(directories_project[i], 644, 1);
 	}
 
 	elix_file file;
 	elix_file_open(&file, "./src/main.cpp", EFF_FILE_WRITE);
-	elix_file_write_string(&file, "#include <iostream>\nint main() {\n\tstd::cout << \"Hello World\" << std::endl;\n}", 0);
+	elix_file_write_string(&file, "#include <iostream>\nint main(int argc, char *argv[]) {\n\tstd::cout << \"Hello World\" << std::endl;\n}", 0);
 	elix_file_close(&file);
 
 
@@ -625,8 +673,6 @@ uint32_t fg_config_arch(CompilerInfo * target, CurrentConfiguration *options, ch
 
 uint32_t fg_config_default(CompilerInfo * target, CurrentConfiguration *options, char * filename ){
 
-	//update_string_from_compilerinfo(config_default_text, 1024, target);
-
 	elix_file file;
 	elix_file_open(&file, filename, EFF_FILE_WRITE);
 	elix_file_write_string(&file, config_default_text, 0);
@@ -796,23 +842,23 @@ int main(int argc, char * argv[]) {
 		} else if ( elix_cstring_has_prefix(argv[var],"-platform") ) {
 			current_program_mode = PM_NEWPLATFORM;
 		} else {
-			push_configmap(&configuration.options, argv[var]);
+			push_configmap(&configuration.options, argv[var], 0);
 		}
 	}
-	LOG_INFO("Target OS: %s %s %x", info.os, info.arch, elix_hash(info.os, elix_cstring_length(info.os, 0)));
 
-
-	//PM_HELP, PM_NEWPROJECT, PM_NEWPLATFORM, PM_GEN
 	switch (current_program_mode) {
 		case PM_NEWPROJECT:
+			LOG_INFO("Target OS: %s %s %x", info.os, info.arch, elix_hash(info.os, elix_cstring_length(info.os, 0)));
 			LOG_INFO("Creating New Project");
 			creeate_newproject(&info);
 			break;
 		case PM_NEWPLATFORM:
+			LOG_INFO("Target OS: %s %s %x", info.os, info.arch, elix_hash(info.os, elix_cstring_length(info.os, 0)));
 			LOG_INFO("Generating Platform files");
 			creeate_newplatform(&info, &configuration);
 			break;
 		case PM_GEN:
+			LOG_INFO("Target OS: %s %s %x", info.os, info.arch, elix_hash(info.os, elix_cstring_length(info.os, 0)));
 			LOG_INFO("Generating Build files");
 			creeate_generator(&info, &configuration);
 			break;
