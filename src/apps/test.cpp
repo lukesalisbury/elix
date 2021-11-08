@@ -9,10 +9,11 @@
 #include "elix_program.hpp"
 #include "elix_os.hpp"
 
-
-
 static elix_fpscounter fps;
 static elix_program_info program_info;
+
+uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
+
 
 void update_buffer_randomly(elix_graphic_data * buffer) {
 	uint32_t * p = buffer->pixels;
@@ -31,19 +32,14 @@ void update_buffer_randomly(elix_graphic_data * buffer) {
 
 bool elix_cstring_equal(const char * A, const char * B) {
 	bool result = (A == B);
-
-	if(A && B)
-	{
-		while(*A && *B && (*A == *B))
-		{
+	if (A && B) {
+		while(*A && *B && (*A == *B)) {
 			++A;
 			++B;
 		}
-
 		result = ((*A == 0) && (*B == 0));
 	}
-
-	return result ;
+	return result;
 }
 
 
@@ -69,12 +65,10 @@ void test_elix_endian() {
 	LOG_MESSAGE("--------------------------------------------------------");
 }
 
-uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
 
 void test_elix_rendertree() {
 	LOG_MESSAGE("--------------------------------------------------------");
 	LOG_MESSAGE("--- Elix Rendertree ------------------------------------");
-
 
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
@@ -87,7 +81,7 @@ void test_elix_rendertree() {
 			elix_os_window_destroy(w);
 			break;
 		}
-		
+
 		fps.update();
 		elix_os_window_render(w);
 		//elix_os_system_idle(16000);
@@ -121,7 +115,7 @@ void test_elix_html() {
 			elix_os_window_destroy(w);
 			break;
 		}
-		
+
 		fps.update();
 		elix_os_window_render(w);
 		//elix_os_system_idle(16000);
@@ -130,8 +124,6 @@ void test_elix_html() {
 	elix_os_window_destroy( w );
 	delete w;
 }
-
-
 
 void test_elix_os_window() {
 	LOG_MESSAGE("--------------------------------------------------------");
@@ -158,7 +150,7 @@ void test_elix_os_window() {
 	rbgabuffer_FillColor(bitmap_context, 0xFFFFf000);
 	rbgabuffer_Fill(bitmap_context);
 
-	rbgabuffer_fillText(bitmap_context, "Test 🐨 🐱‍🚀 sadf", 10, 16, 500);
+	rbgabuffer_FillText(bitmap_context, "Test 🐨 🐱‍🚀 sadf", 10, 16, 500);
 
 	while(elix_os_window_handle_events(w) ) {
 		if ( w->flags & EOE_WIN_CLOSE ) {
@@ -195,8 +187,6 @@ void test_elix_rgbabuffer() {
 	rbgabuffer_ClosePath(bitmap_context);
 	rbgabuffer_FillColor(bitmap_context, 0xFFFFf000);
 	rbgabuffer_Fill(bitmap_context);
-
-
 
 	printf("   0%*c%d\n", bitmap_context->memory->width-2, ' ', bitmap_context->memory->width  );
 	uint32_t colour;
@@ -267,14 +257,12 @@ void test_elix_cstring() {
 
 
 	LOG_MESSAGE("String Used: %s", testB); // 18
-	LOG_MESSAGE("Left Substr: %s [" pZU ":%d] from %d", leftsub, elix_cstring_length(leftsub), 13, 5);
-	LOG_MESSAGE("Left with negSubstr: %s [" pZU ":%d] from %d", leftnegsub,elix_cstring_length(leftnegsub), 5,  -5);
-	LOG_MESSAGE("Mid Substr: %s [" pZU ":%d] from %d with length %d", midsub, elix_cstring_length(midsub),5,  2, 5);
-	LOG_MESSAGE("Mid with neg Substr: %s [" pZU ":%d] from %d with length %d", midnegsub, elix_cstring_length(midnegsub),14, 2, -2);
-	LOG_MESSAGE("Right Substr: %s [" pZU ":%d] from %d with length %d", rightsub, elix_cstring_length(rightsub),10, 0, 10);
-	LOG_MESSAGE("right with neg Substr: %s [" pZU ":%d] from %d with length %d", rightnegsub,  elix_cstring_length(rightnegsub),8, 0, -10);
-
-	
+	LOG_MESSAGE("Left Substr: %s [" pZU ":%d] from " pZD, leftsub, elix_cstring_length(leftsub), 13, 5);
+	LOG_MESSAGE("Left with negSubstr: %s [" pZU ":%d] from " pZD, leftnegsub,elix_cstring_length(leftnegsub), 5,  -5);
+	LOG_MESSAGE("Mid Substr: %s [" pZU ":%d] from %d with length " pZD, midsub, elix_cstring_length(midsub),5,  2, 5);
+	LOG_MESSAGE("Mid with neg Substr: %s [" pZU ":%d] from %d with length " pZD, midnegsub, elix_cstring_length(midnegsub),14, 2, -2);
+	LOG_MESSAGE("Right Substr: %s [" pZU ":%d] from %d with length " pZD, rightsub, elix_cstring_length(rightsub),10, 0, 10);
+	LOG_MESSAGE("right with neg Substr: %s [" pZU ":%d] from %d with length " pZD, rightnegsub,  elix_cstring_length(rightnegsub),8, 0, -10);
 }
 
 void test_elix_program() {
@@ -511,10 +499,10 @@ int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 	program_info = elix_program_info_create(argv[0], "Elix Test Program", "0.4", nullptr);
 	//test_run("Program Info", &test_elix_program);
 	//test_run("Endian", &test_elix_endian);
-	//test_run("Rendertree", &test_elix_html);
+	test_run("Rendertree", &test_elix_html);
 	//test_run("Hash table", &test_elix_hash);
 
-	test_run("CANVAS", &test_elix_os_window);
+	//test_run("CANVAS", &test_elix_os_window);
 
 	//test_run("Directory Watcher", &test_directory_watch);
 	//test_elix_rgbabuffer();

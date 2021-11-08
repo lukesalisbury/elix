@@ -159,7 +159,7 @@ void rbgabuffer_StrokeColor(rbgabuffer_context* ctx, uint32_t color );
 void rbgabuffer_FillColor(rbgabuffer_context* ctx, uint32_t color);
 
 
-void rbgabuffer_fillText(rbgabuffer_context* ctx, const char * text, float x, float y, float maxWidth);
+void rbgabuffer_FillText(rbgabuffer_context* ctx, const char * text, float x, float y, float maxWidth);
 elix_text_metrics rbgabuffer_measureText(rbgabuffer_context* ctx, const char * text);
 
 

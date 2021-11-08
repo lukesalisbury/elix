@@ -107,10 +107,10 @@ info:
 
 $(ninja_files): $(MAINCODE) $(SHAREDCODE) $(BINARIES)
 	${shell $(command_write) " " >> $(ninja_files)}
-	${shell $(command_write) "default $(patsubst %.exe,\$${binary_prefix}%\$${binary_suffix},$(notdir $(BINARIES)))" >> $(ninja_files)}
+	${shell $(command_write) "default $(patsubst %.so,\$${binary_prefix}%.so,$(patsubst %.exe,\$${binary_prefix}%\$${binary_suffix},$(notdir $(BINARIES))))" >> $(ninja_files)}
 
 %.so:
-	${shell $(command_write) "build $(patsubst %.so,\$${binary_prefix}%\$${binary_suffix},$(notdir $@)): link \$${object_dir}/$(@:%.exe=%.o) $(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(SHAREDCODE:%=\$${object_dir}/%)))" >> $(ninja_files)}
+	${shell $(command_write) "build $(patsubst %.so,\$${binary_prefix}%.so,$(notdir $@)): link_shared \$${object_dir}/$(@:%.so=%.o) $(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(SHAREDCODE:%=\$${object_dir}/%)))" >> $(ninja_files)}
 
 %.exe:
 	${shell $(command_write) "build $(patsubst %.exe,\$${binary_prefix}%\$${binary_suffix},$(notdir $@)): link \$${object_dir}/$(@:%.exe=%.o) $(patsubst %.cpp,%.o,$(patsubst %.c,%.o,$(SHAREDCODE:%=\$${object_dir}/%)))" >> $(ninja_files)}

@@ -26,15 +26,15 @@ rule compile_asm
   description = Building $in [ASM]
 
 rule link_shared
-  command = $linker -shared $platform_lib_flags $in -o $out  $platform_lib $compiler_lib $debug_flag
+  command = $linker -shared $platform_lib_flags $in -o ${binary_prefix}$out  $platform_lib $compiler_lib $debug_flag
   description = Creating $out
 
 rule link_static
-  command = $linker -static $platform_lib_flags $in -o $out  $platform_lib $compiler_lib $debug_flag
+  command = $linker -static $platform_lib_flags $in -o ${binary_prefix}$out  $platform_lib $compiler_lib $debug_flag
   description = Creating $out
 
 rule link
-  command = $linker $platform_lib_flags $in -o $out  $platform_lib $compiler_lib $debug_flag
+  command = $linker $platform_lib_flags $in -o ${binary_prefix}$out  $platform_lib $compiler_lib $debug_flag
   description = Creating $out
 
 rule clean

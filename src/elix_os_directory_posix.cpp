@@ -67,3 +67,49 @@ uint8_t elix_os_directory_is( const char * path, UNUSEDARG elix_consent * consen
 	return false;
 }
 
+
+elix_directory * elix_os_directory_list_files(const char * path, const char * suffix, elix_consent * consent) {
+	elix_directory * directory = nullptr;
+	DIR * current_directory;
+	struct dirent * entity;
+	current_directory = opendir(path);
+	if ( !current_directory ) {
+		return directory;
+	}
+	directory = calloc(1, sizeof(directory));
+	while (entity = readdir(current_directory) ) {
+		if ( entity->d_name[0] == '.' && (entity->d_name[1] == '.'|| entity->d_name[1]== 0)){
+
+		} else if (suffix) {
+			if ( elix_cstring_has_suffix(entity->d_name, suffix ) )
+				directory->count++;
+		} else {
+			directory->count++;
+		}
+	}
+	size_t path_len = elix_cstring_length(path, 0);
+	directory->files = malloc(directory->count * sizeof(elix_path));
+	rewinddir(current_directory);
+	uint16_t index = 0;
+	char buffer[ELIX_FILE_PATH_LENGTH] = {0};
+	elix_cstring_copy(path, buffer);
+	while (entity = readdir(current_directory) ) {
+		if ( entity->d_name[0] == '.' && (entity->d_name[1] == '.'|| entity->d_name[1]== 0)){
+
+		} else if (suffix) {
+			if ( elix_cstring_has_suffix(entity->d_name, suffix ) ) {
+				memset(buffer+path_len, 0, ELIX_FILE_PATH_LENGTH-path_len);
+				elix_cstring_append(buffer, ELIX_FILE_PATH_LENGTH, entity->d_name, elix_cstring_length(entity->d_name, 0));
+				directory->files[index] = elix_path_create(buffer);
+				index++;
+			}
+		} else {
+			memset(buffer+path_len, 0, ELIX_FILE_PATH_LENGTH-path_len);
+			elix_cstring_append(buffer, ELIX_FILE_PATH_LENGTH, entity->d_name, elix_cstring_length(entity->d_name, 0));
+			directory->files[index] = elix_path_create(buffer);
+			index++;
+		}
+	}
+	closedir(current_directory);
+	return directory;
+}

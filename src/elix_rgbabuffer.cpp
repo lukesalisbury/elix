@@ -664,7 +664,7 @@ void rgbabuffer__fillChar(rbgabuffer_context* ctx, rgbabuffer_font * font, uint3
 
 #include "elix_cstring.hpp"
 
-void rbgabuffer_fillText(rbgabuffer_context* ctx, const char * text, float x, float y, float maxWidth) {
+void rbgabuffer_FillText(rbgabuffer_context* ctx, const char * text, float x, float y, float maxWidth) {
 	rgbabuffer_font * font = rbgabuffer__loadFont(ctx, "Sans-Serif");
 	if ( !font ) {
 		return;

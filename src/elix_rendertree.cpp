@@ -22,11 +22,15 @@ uint32_t elix_rendertreeitem_to_rgbabuffer(elix_rendertree_item * item, rbgabuff
 
 	switch (item->data_type) {
 		case ERTD_STRING:
-			//std::string *str = static_cast<std::string *>(item->data);
-			rbgabuffer_FillColor(ctx, item->render_style.colour.hex);
-			rbgabuffer_fillText(ctx, "Hello World", 10, 16, 500);
+			
+			if ( item->data ) {
+				std::string * str = static_cast<std::string *>(item->data);
+				rbgabuffer_FillColor(ctx, item->render_style.colour.hex);
+				rbgabuffer_FillText(ctx, "Testing", item->render_style.x, item->render_style.y, item->render_style.width);
+			}
+			
 			break;
-
+/*
 		case ERTD_EMPTY:
 			break;
 		case ERTD_IMAGE:
@@ -36,6 +40,7 @@ uint32_t elix_rendertreeitem_to_rgbabuffer(elix_rendertree_item * item, rbgabuff
 		case ERTD_COUNT:
 		case ERTD_UPDATE:
 		break;
+*/
 		default:
 			rbgabuffer_BeginPath(ctx);
 			rbgabuffer_MoveTo(ctx, item->render_style.x, item->render_style.y);
@@ -58,7 +63,7 @@ uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_contex
 	ASSERT(tree);
 	ASSERT(ctx);
 	if ( tree->root ) {
-		LOG_MESSAGE("Buffer Size %zdx%zd", ctx->dimensions.width, ctx->dimensions.height);
+		LOG_MESSAGE("Buffer Size " pZD "x" pZD, ctx->dimensions.width, ctx->dimensions.height);
 
 		elix_rendertreeitem_to_rgbabuffer(tree->root, ctx);
 		

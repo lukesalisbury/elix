@@ -420,7 +420,7 @@ namespace elix {
 					printf("'%s'\n", obj->textContent.c_str());
 					break;
 				default:
-					printf("> %s\n", obj->name);
+					printf("[%s]\n", obj->name);
 					break;
 			}
 
@@ -440,31 +440,80 @@ namespace elix {
 			}
 		}
 
-		uint8_t build_rendertree_item(elix::html::node &node, elix_rendertree_item *& item, elix_rendertree_item * parent) {
+		void attached_rendertree_item(elix::html::node_object * node, elix_rendertree_item * item) {
+			node->render_item.children.insert(node->render_item.children.end(), 1, item);
+		}
 
+		void deattached_rendertree_item(elix::html::node_object * node, elix_rendertree_item * item) {
+			node->render_item.children.insert(node->render_item.children.end(), 1, item);
+		}
+
+
+		void update_rendertree_item(document * doc, elix::html::node &node, elix_rendertree_item *& item) {
+			node_object * obj = node.get();
+			switch (obj->type) {
+				case ELEMENT_RAWTEXT:
+					item->render_style.backgroundColour.hex = 0x000000FF;
+					item->data = &obj->textContent;
+					item->data_type = ERTD_STRING;
+					item->render_style.display = ERT_INLINEBLOCK;
+					break;
+				case ELEMENT_NORMAL:
+					item->data_type = ERTD_EMPTY;
+					item->render_style.display = ERT_BLOCK;
+
+					//item->data = &obj->textContent;
+					break;
+				default:
+					item->data_type = ERTD_EMPTY;
+					break;
+			}
+
+			for (elix_rendertree_item *  q: item->children) {
+				
+		
+			}
+		}
+
+		void update_render_tree(elix::html::node * node, elix_rendertree & tree) {
+			
+		}
+
+		uint8_t build_rendertree_item(document * doc, elix::html::node &node, elix_rendertree_item * parent) {
 			node_object * obj = node.get();
 			if (obj->type) {
-				if ( item == nullptr )
-					item = new elix_rendertree_item;
-
 				switch (obj->type) {
 					case ELEMENT_RAWTEXT:
-						item->render_style.backgroundColour.hex = 0x00;
-						item->data = &obj->textContent;
-						item->data_type = ERTD_STRING;
+						obj->render_item.render_style.backgroundColour.hex = 0x000000FF;
+						obj->render_item.data = &obj->textContent;
+						obj->render_item.data_type = ERTD_STRING;
+						obj->render_item.render_style.display = ERT_INLINEBLOCK;
+						printf("ELEMENT_RAWTEXT\n");
 						break;
 					case ELEMENT_NORMAL:
-						item->data_type = ERTD_STRING;
+						obj->render_item.data_type = ERTD_EMPTY;
+						obj->render_item.render_style.display = ERT_BLOCK;
+						if ( parent ) {
+							obj->render_item.render_style.backgroundColour.hex = 0xFFFFFFFF;
+							obj->render_item.render_style.width = parent->render_style.width;
+						} else  {
+							obj->render_item.render_style.backgroundColour.hex = 0xFF0000FF;
+							obj->render_item.render_style.width = doc->rendertree.width;
+							obj->render_item.render_style.height = doc->rendertree.height;
+						}
+						printf("ELEMENT_NORMAL\n");
 						break;
 					default:
-						item->data_type = ERTD_EMPTY;
+						obj->render_item.data_type = ERTD_EMPTY;
 						break;
 				}
 
+				obj->render_item.children.clear();
+
 				for (elix::html::node q: obj->children) {
-					elix_rendertree_item * subitem = new elix_rendertree_item;
-					build_rendertree_item(q, subitem, item);
-					item->children.push_back(subitem);
+					node_object * q_obj = q.get();
+					build_rendertree_item(doc, q, &obj->render_item);
+					obj->render_item.children.push_back(&q.get()->render_item);
 				}
 
 				return 0;
@@ -473,14 +522,38 @@ namespace elix {
 			return 1;
 		}
 
-		void update_render_tree(elix::html::node * node, elix_rendertree & tree) {
-			
+
+
+
+
+
+
+		void clear_rendertree_item(elix_rendertree_item *& item) {
+			for (elix_rendertree_item * q: item->children) {
+				clear_rendertree_item(q);
+			}
+			item->children.clear();
+			delete item;
+
 		}
 
-		elix_rendertree get_render_tree(document * doc, elix_uv32_2 dimension) {
+
+		void clear_render_tree(document * doc) {
+			if (doc->root.get()->type) {
+				clear_rendertree_item(doc->rendertree.root);
+			} else {
+				printf("No Root Node found\n");
+			}
+
+
+		}
+
+		elix_rendertree build_render_tree(document * doc, elix_uv32_2 dimension) {
 
 			if (doc->root.get()->type) {
-				build_rendertree_item(doc->root, doc->rendertree.root, nullptr);
+				doc->rendertree.width = dimension.width;
+				doc->rendertree.height = dimension.height;
+				build_rendertree_item(doc, doc->root, nullptr);
 			} else {
 				printf("No Root Node found\n");
 			}
