@@ -17,11 +17,6 @@ it and redistribute it freely, subject to the following restrictions:
 #include <string>
 
 #if defined PLATFORM_WINDOWS
-
-#elif defined PLATFORM_LINUX
-
-#endif
-
 namespace elix {
 	namespace association {
 
@@ -81,3 +76,10 @@ namespace elix {
 		}
 	}
 }
+
+#elif defined PLATFORM_LINUX
+
+#else
+
+#endif
+

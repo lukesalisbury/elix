@@ -14,10 +14,17 @@
  3. This notice may not be removed or altered from any source distribution.
 ***********************************************************************************************************************/
 
+
+
 #include "elix_html.hpp"
-#include <codecvt>
+
+
+//#include <codecvt>
 #include <locale>
 #include <cstring>
+
+
+
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
 namespace elix {
@@ -172,11 +179,21 @@ namespace elix {
 			}
 			return next_node;
 		}
+template<class I, class E, class S>
+struct codecvt : std::codecvt<I, E, S>
+{
+    ~codecvt()
+    { }
+};
+		std::string getStringFromU32String(std::u32string & buffer) {
+			std::wstring_convert<codecvt<char32_t, char, mbstate_t>, char32_t> string_convert;
+			return getStringFromU32String(buffer);
+		}
 
 		inline elix::html::node pushElementNode(elix::html::node current_node, document & doc, std::u32string & buffer) {
-			std::wstring_convert<std::codecvt<char32_t, char, mbstate_t>, char32_t> string_convert;
+			//std::wstring_convert<std::codecvt<char32_t, char, mbstate_t>, char32_t> string_convert;
 			elix::html::node next_node = pushNode(current_node,doc);
-			std::string name = string_convert.to_bytes(buffer);
+			std::string name = getStringFromU32String(buffer);
 			memcpy(next_node.get()->name, name.c_str(), 16);
 			next_node.get()->type = ELEMENT_NORMAL;
 			buffer.clear();
@@ -184,9 +201,10 @@ namespace elix {
 		}
 
 		inline elix::html::node pushVoidNode(elix::html::node current_node, document & doc, std::u32string & buffer) {
-			std::wstring_convert<std::codecvt<char32_t, char, mbstate_t>, char32_t> string_convert;
+			//std::wstring_convert<std::codecvt<char32_t, char, mbstate_t>, char32_t> string_convert;
 			elix::html::node next_node = pushNode(current_node,doc);
-			next_node.get()->textContent = string_convert.to_bytes(buffer);
+			next_node.get()->textContent = getStringFromU32String(buffer);
+			
 			next_node.get()->type = ELEMENT_VOID;
 			buffer.clear();
 			return next_node;
@@ -196,7 +214,7 @@ namespace elix {
 		}
 
 		elix::html::status parse(elix::html::document & doc, elix::html::status * lastStatus) {
-			std::wstring_convert<std::codecvt<char32_t, char, mbstate_t>, char32_t> string_convert;
+			
 			elix::html::node current_node;
 			elix::html::status current;
 
@@ -224,7 +242,7 @@ namespace elix {
 			if ( current.offset ) {
 				text += (signed)current.offset;
 			}
-			string_convert.to_bytes(buffer);
+			//getStringFromU32String(buffer);
 
 			size_t d = 0;
 			parse_next_info reset_parse_next_info;
@@ -270,7 +288,7 @@ namespace elix {
 						case PARSE_SCAN_DOCTYPE: {
 							//TODO check if > is not in quotes
 							if ( char32.value == '>' ) {
-								printf("Doctype '%s'\n", string_convert.to_bytes(buffer).c_str());
+								printf("Doctype '%s'\n", getStringFromU32String(buffer).c_str());
 								state = STATECHANGE(PARSE_NONE, d);
 								buffer.clear();
 							} else {
@@ -373,7 +391,7 @@ namespace elix {
 									current_node = pushNode(current_node, doc);
 									memcpy(current_node.get()->name, "TextNode", 9);
 									current_node.get()->type = ELEMENT_RAWTEXT;
-									current_node.get()->textContent = string_convert.to_bytes(buffer);
+									current_node.get()->textContent = getStringFromU32String(buffer);
 									current_node = popNode(current_node);
 								}
 								state = STATECHANGE(PARSE_TAG, d);

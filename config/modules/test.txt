@@ -1,0 +1,2 @@
+#elix
+./src/apps/test.cpp

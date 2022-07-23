@@ -1,0 +1,22 @@
+[libs]
+stdc++
+m
+pthread
+wayland-client
+dbus-1
+SDL2
+[lib_flags]
+-std=c++11
+
+[includes]
+src
+include
+[flags]
+-std=c++11
+[defines]
+PLATFORM_LINUX
+[linker_flags]
+-Wl,-rpath -Wl,\$$ORIGIN/lib
+[pkg-linux]
+dbus-1
+sdl2

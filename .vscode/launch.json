@@ -8,8 +8,7 @@
 			"name": "Debug",
 			"type": "cppdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/bin/test-debug-windows-x86_64.exe",
-			"args": [],
+			
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}",
 			"environment": [],
@@ -23,7 +22,18 @@
 				}
 			],
 			"preLaunchTask": "Build",
-			"miDebuggerPath": "C:/dev/TDM-GCC-64/bin/gdb.exe"
+
+			"linux": {
+				"miDebuggerPath": "/usr/bin/gdb",
+				"program": "${workspaceFolder}/bin/example_window-debug-linux-x86_64",
+				"args": [],
+
+			},
+			"windows": {
+				"miDebuggerPath": "C:/dev/TDM-GCC-64/bin/gdb.exe",
+				"program": "${workspaceFolder}/bin/test-debug-windows-x86_64.exe",
+				"args": [],
+			}
 		}
 	]
 }

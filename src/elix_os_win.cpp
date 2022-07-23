@@ -1,3 +1,5 @@
+#ifdef PLATFORM_WINDOWS
+
 #ifndef ELIX_OS_WIN_HPP
 #define ELIX_OS_WIN_HPP
 
@@ -74,3 +76,4 @@ elix_databuffer elix_os_font(const char * font_name ) {
 
 
 #endif // ELIX_SYSINFO_HPP
+#endif

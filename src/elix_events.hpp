@@ -42,6 +42,7 @@ enum elix_os_event_type {
 	EOE_WIN_MINIMISE = 1 << 25,
 	EOE_WIN_ACTIVE  = 1 << 26,
 	EOE_WIN_REFRESH = 1 << 27,
+	EOE_WIN_INACTIVE  = 1 << 28,
 
 	EOE_INVERT = 1 << 30,
 	EOE_USEREVENT = 1 << 31,
@@ -65,8 +66,8 @@ struct elix_os_event {
 #define ELIX_EVENT_QUEUE_SIZE 64
 
 struct elix_os_event_queue {
-	uint32_t filter;
-	elix_os_event queue[ELIX_EVENT_QUEUE_SIZE];
+	uint32_t filter = EOE_ALL;
+	elix_os_event event[ELIX_EVENT_QUEUE_SIZE];
 	uint8_t push_index = 0;
 	uint8_t pull_index = 0;
 };
@@ -74,13 +75,25 @@ struct elix_os_event_queue {
 void elix_os_event_set_filter(uint32_t filter = EOE_ALL);
 
 
-inline void elix_os_event_push_event( elix_os_event_queue * queue, uint32_t type ) {
+inline void elix_os_event_push_eventtype( elix_os_event_queue * queue, uint32_t type ) {
 	if ( queue->filter & type ) {
 		if ( queue->push_index < ELIX_EVENT_QUEUE_SIZE ) {
-
+			queue->event[ queue->push_index ].type = type;
+			queue->push_index++;
 		}
 	}
+}
 
+inline void elix_os_event_push_event( elix_os_event_queue * queue, elix_os_event event ) {
+	if ( queue->filter & event.type ) {
+		if ( queue->push_index < ELIX_EVENT_QUEUE_SIZE ) {
+			queue->event[ queue->push_index ] = event;
+			queue->push_index++;
+		}
+	}
+}
+inline void elix_os_event_end_frame( elix_os_event_queue * queue, elix_os_event event ) {
+	queue->push_index = 0;
 
 }
 

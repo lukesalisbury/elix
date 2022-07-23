@@ -93,7 +93,11 @@ Built-ins LOG_+ functions do not print anything.
 
 
 
-##Platform Nots
+##Platform Notes
 ### Wayland
 wayland-scanner private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml include/wayland/xdg-shell-protocol.c
 wayland-scanner client-header /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml include/xdg-shell-client-protocol.h
+
+
+wayland-scanner private-code /usr/share/wayland-protocols/unstable/primary-selection/primary-selection-unstable-v1.xml include/wayland/primary-selection-protocol.c
+wayland-scanner client-header /usr/share/wayland-protocols/unstable/primary-selection/primary-selection-unstable-v1.xml include/primary-selection-client-protocol.h

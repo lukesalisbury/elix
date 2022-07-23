@@ -1,0 +1,88 @@
+ninja_required_version = 1.3
+builddir=compile/linux-x86_64/log
+compiler_lib = -lstdc++ -lm -lpthread -lwayland-client -ldbus-1 -lSDL2 
+compiler_lib_flags = -std=c++11 -g3 
+compiler_flags = -std=c++11 -g3 
+compiler_includes = -Isrc -Iinclude -I/usr/lib64/dbus-1.0/include/ -I/usr/include/dbus-1.0/ 
+compller_defines = -DPLATFORM_LINUX -DPLATFORM_BITS=64 
+compiler_mode = debug
+finaliser_flags = 
+binary_prefix = bin/
+binary_suffix = -debug-linux-x86_64
+compiler = gcc
+linker = gcc
+static_linker = ar -rc
+program_suffix = 
+shared_suffix = .so
+static_suffix = .a
+object_dir = compile/linux-x86_64/debug
+
+rule compile_cpp
+  command = ${compiler} ${compiler_includes} ${compller_defines} ${compiler_flags} -o $out -c $in
+  description = [compile_cpp] $in
+
+rule compile_c
+  command = ${compiler} ${compiler_includes} ${compller_defines}  ${compiler_flags} -o $out -c $in
+  description = [compile_c] $in
+
+rule link_shared
+  command = ${linker} -shared ${compiler_lib_flags} $in -o ${binary_prefix}$out
+  description = [link_shared] $in
+
+rule link_static
+  command = ${static_linker} $out $in
+  description = [link_static] $in
+
+rule link
+  command = ${linker} ${compiler_lib_flags} $in -o ${binary_prefix}$out ${compiler_lib}
+  description = [link] $in
+
+rule finalise
+  command = ${finaliser} ${finalise_flags} $in -o ${binary_prefix}$out
+  description = [finalise] $in
+
+rule build_resources
+  command = echo
+  description = [build_resources] $in
+
+rule clean
+  command = rm -rf ${object_dir}
+  description = [clean] $in
+
+
+build clean: clean
+
+#Files
+
+
+build ${object_dir}/test_window.o: compile_cpp examples/test_window.cpp
+
+build example_window${binary_suffix}${program_suffix}: link ${object_dir}/test_window.o elix${binary_suffix}${static_suffix} 
+
+build ${object_dir}/filetransfer.o: compile_cpp examples/filetransfer.cpp
+
+build filetransfer${binary_suffix}${program_suffix}: link ${object_dir}/filetransfer.o elix${binary_suffix}${static_suffix} 
+
+build ${object_dir}/apps/test.o: compile_cpp src/apps/test.cpp
+
+build test${binary_suffix}${program_suffix}: link ${object_dir}/apps/test.o elix${binary_suffix}${static_suffix} 
+
+build ${object_dir}/elix_cstring.o: compile_cpp src/elix_cstring.cpp
+build ${object_dir}/elix_endian.o: compile_cpp src/elix_endian.cpp
+build ${object_dir}/elix_events.o: compile_cpp src/elix_events.cpp
+build ${object_dir}/elix_file.o: compile_cpp src/elix_file.cpp
+build ${object_dir}/elix_hashmap.o: compile_cpp src/elix_hashmap.cpp
+build ${object_dir}/elix_os_notification_wayland.o: compile_cpp src/elix_os_notification_wayland.cpp
+build ${object_dir}/elix_os.o: compile_cpp src/elix_os.cpp
+build ${object_dir}/elix_os_association.o: compile_cpp src/elix_os_association.cpp
+build ${object_dir}/elix_os_window.o: compile_cpp src/elix_os_window.cpp
+build ${object_dir}/elix_package.o: compile_cpp src/elix_package.cpp
+build ${object_dir}/elix_program.o: compile_cpp src/elix_program.cpp
+build ${object_dir}/elix_rendertree.o: compile_cpp src/elix_rendertree.cpp
+build ${object_dir}/elix_rgbabuffer.o: compile_cpp src/elix_rgbabuffer.cpp
+build ${object_dir}/elix_html.o: compile_cpp src/elix_html.cpp
+
+build elix${binary_suffix}${static_suffix}: link_static ${object_dir}/elix_cstring.o ${object_dir}/elix_endian.o ${object_dir}/elix_events.o ${object_dir}/elix_file.o ${object_dir}/elix_hashmap.o ${object_dir}/elix_os_notification_wayland.o ${object_dir}/elix_os.o ${object_dir}/elix_os_association.o ${object_dir}/elix_os_window.o ${object_dir}/elix_package.o ${object_dir}/elix_program.o ${object_dir}/elix_rendertree.o ${object_dir}/elix_rgbabuffer.o ${object_dir}/elix_html.o 
+
+
+default example_window${binary_suffix}${program_suffix} filetransfer${binary_suffix}${program_suffix} test${binary_suffix}${program_suffix} elix${binary_suffix}${static_suffix} 

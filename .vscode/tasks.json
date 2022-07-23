@@ -4,6 +4,19 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "Touch",
+			"type": "shell",
+
+				"options": {
+					"cwd": "${workspaceFolder}/"
+				},
+				"command": "touch",
+				"args": ["src/elix_os_window.cpp", "src/elix_os.cpp"],
+
+			"problemMatcher": ["$gcc"],
+			"group": "build"
+		},
+		{
 			"label": "Build",
 			"type": "shell",
 			"linux": {
@@ -19,6 +32,7 @@
 				"command": "c:/dev/ninja",
 				"args": ["2>&1"]
 			},
+			"dependsOn": "Touch",
 			"problemMatcher": ["$gcc"],
 			"group": {
 				"kind": "build",
@@ -33,7 +47,7 @@
 					"cwd": "${workspaceFolder}/"
 				},
 				"command": "ninja",
-				"args": "clean"
+				"args": ["clean"]
 
 			},
 			"windows": {

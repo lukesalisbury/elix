@@ -24,6 +24,9 @@ struct elix_os_opengl {
 
 
 struct elix_os_window : elix_os_window_common {
+
+	/* local */
+	wl_data_device_manager * data_device_manager = nullptr;
 	wl_buffer * buffer;
 	wl_shm_pool * pool;
 	wl_surface * surface;

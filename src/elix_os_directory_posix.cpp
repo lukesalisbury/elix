@@ -67,7 +67,7 @@ uint8_t elix_os_directory_is( const char * path, UNUSEDARG elix_consent * consen
 	return false;
 }
 
-
+/*
 elix_directory * elix_os_directory_list_files(const char * path, const char * suffix, elix_consent * consent) {
 	elix_directory * directory = nullptr;
 	DIR * current_directory;
@@ -113,3 +113,4 @@ elix_directory * elix_os_directory_list_files(const char * path, const char * su
 	closedir(current_directory);
 	return directory;
 }
+*/

@@ -1,3 +1,5 @@
+#ifdef PLATFORM
+
 #include "elix_os_window.hpp"
 /*
 int8_t elix_os_opengl__setup_pixel_format(HDC hdc)
@@ -189,3 +191,12 @@ bool elix_os_window_handle_events( elix_os_window * win) {
 	return true;
 }
 
+
+
+
+char * elix_os_clipboard_get() {
+	return nullptr;
+}
+void elix_os_clipboard_put(char * utfstring) {
+	
+}

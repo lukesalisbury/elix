@@ -1,3 +1,4 @@
+#ifdef PLATFORM_WINDOWS
 
 #include "elix_core.h"
 #include "elix_consent.hpp"
@@ -174,3 +175,6 @@ void elix_os_directory_watch_stop( elix_directory_watcher * watcher, UNUSEDARG e
 	FindCloseChangeNotification(watcher->handle);
 }
 */
+
+
+#endif

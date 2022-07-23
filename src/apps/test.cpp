@@ -108,7 +108,7 @@ void test_elix_html() {
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
-	elix_rendertree tree = elix::html::get_render_tree(&html, bitmap_context->dimensions);
+	elix_rendertree tree = elix::html::build_render_tree(&html, bitmap_context->dimensions);
 	elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
 	while(elix_os_window_handle_events(w) ) {
 		if ( w->flags & EOE_WIN_CLOSE ) {

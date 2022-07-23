@@ -1,2 +1,2 @@
-include build/default.ninja
-include scripts/core.ninja
+include ./compile/linux-x86_64/build.ninja
+

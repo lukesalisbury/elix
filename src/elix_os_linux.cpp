@@ -1,3 +1,4 @@
+#ifdef PLATFORM_LINUX
 #ifndef ELIX_OS_LINUX_HPP
 #define ELIX_OS_LINUX_HPP
 
@@ -74,4 +75,5 @@ void elix_os_system_idle(uint32_t time)
 	
 }
 
+#endif
 #endif

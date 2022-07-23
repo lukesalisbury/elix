@@ -1,0 +1,24 @@
+[options]
+compiler=$tripletgcc
+linker=$tripletgcc
+static_linker=ar -rc
+program_suffix=
+shared_suffix=.so
+static_suffix=.a
+[options-windows]
+program_suffix=.exe
+[options-3ds]
+finaliser=3dsxtool
+program_suffix=.elf
+finalise_suffix=.3dsx
+[commands]
+compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_flags} -o $out -c $in
+compile_c=${compiler} ${compiler_includes} ${compller_defines}  ${compiler_flags} -o $out -c $in
+link_shared=${linker} -shared ${compiler_lib_flags} $in -o ${binary_prefix}$out
+link_static=${static_linker} $out $in 
+link=${linker} ${compiler_lib_flags} $in -o ${binary_prefix}$out ${compiler_lib} 
+finalise=${finaliser} ${finalise_flags} $in -o ${binary_prefix}$out
+build_resources=echo
+clean=rm -rf ${object_dir}
+[options]
+name=elix
