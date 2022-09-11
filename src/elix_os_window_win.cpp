@@ -197,6 +197,6 @@ bool elix_os_window_handle_events( elix_os_window * win) {
 char * elix_os_clipboard_get() {
 	return nullptr;
 }
-void elix_os_clipboard_put(char * utfstring) {
+void elix_os_clipboard_put(const char * utfstring) {
 	
 }

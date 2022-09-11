@@ -5,7 +5,7 @@ char * elix_os_clipboard_get() {
 	return SDL_GetClipboardText();
 }
 
-void elix_os_clipboard_put(char * utfstring) {
+void elix_os_clipboard_put(const char * utfstring) {
 	LOG_INFO("Writing to clipboard '%s'", utfstring );
 	SDL_SetClipboardText(utfstring);
 }

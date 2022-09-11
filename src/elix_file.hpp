@@ -102,7 +102,7 @@ inline size_t elix_file_write_string( elix_file * file, const char * string, siz
 
 inline elix_file * elix_file_new(const char * filename) {
 	elix_file * file = new elix_file();
-	elix_file_open(file, filename);
+	elix_file_open(file, filename,EFF_FILE_WRITE, nullptr);
 	return file;
 }
 

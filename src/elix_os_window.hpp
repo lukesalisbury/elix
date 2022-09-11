@@ -44,7 +44,7 @@ void elix_os_window_render( elix_os_window * wwin );
 void elix_os_window_destroy( elix_os_window * win );
 
 char * elix_os_clipboard_get();
-void elix_os_clipboard_put(char * utfstring);
+void elix_os_clipboard_put(const char * utfstring);
 
 /*
 void * elix_os_clipboard_get_data();

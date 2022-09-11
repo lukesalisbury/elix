@@ -63,9 +63,9 @@ build ${object_dir}/filetransfer.o: compile_cpp examples/filetransfer.cpp
 
 build filetransfer${binary_suffix}${program_suffix}: link ${object_dir}/filetransfer.o elix${binary_suffix}${static_suffix} 
 
-build ${object_dir}/apps/test.o: compile_cpp src/apps/test.cpp
+build ${object_dir}/test.o: compile_cpp examples/test.cpp
 
-build test${binary_suffix}${program_suffix}: link ${object_dir}/apps/test.o elix${binary_suffix}${static_suffix} 
+build test${binary_suffix}${program_suffix}: link ${object_dir}/test.o elix${binary_suffix}${static_suffix} 
 
 build ${object_dir}/elix_cstring.o: compile_cpp src/elix_cstring.cpp
 build ${object_dir}/elix_endian.o: compile_cpp src/elix_endian.cpp

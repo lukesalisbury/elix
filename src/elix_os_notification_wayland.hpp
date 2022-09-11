@@ -6,24 +6,42 @@
 #include <unistd.h>
 #include <dbus-1.0/dbus/dbus.h>
 
-struct elix_window_notification
+
+struct elix_window_notification_settings
 {
 	/* data */
-	char * application;
 	unsigned id;
 	char * icon;
 	char * summary;
 	char * body;
 	char * default_action;
 	char * action_text;
+	
+};
 
+
+
+
+struct elix_window_notification
+{
+	/* data */
+	const char * application;
 	/* */
 	uint32_t exiting;
 	DBusConnection * connection;
-	DBusMessage * message;
+	DBusMessage * messages[8];
 
-	void (*callback) (char * action_key);
 };
 
+
+struct elix_window_notification_message
+{
+	elix_window_notification * handler;
+	DBusMessage * message;
+	uint32_t index;
+
+	void (*action_callback) (elix_window_notification_message * message);
+	void * action_data;
+};
 
 #endif

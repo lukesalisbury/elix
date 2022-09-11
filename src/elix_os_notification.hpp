@@ -1,11 +1,5 @@
 #include "elix_core.h"
 
-
-struct elix_window_notification_action
-{
-void (*callback) (char * action_key);
-};
-
 #if defined PLATFORM_WINDOWS
 	#include "elix_os_notification_windows.hpp"
 #elif defined PLATFORM_LINUX
@@ -14,8 +8,13 @@ void (*callback) (char * action_key);
 	#error "Unsupported platform"
 #endif
 
-
-
-elix_window_notification elix_window_notification_new( char * application, unsigned id, char * icon, char *summary, char * body, char * default_action,	char * action_text, elix_window_notification_action callback );
+elix_window_notification elix_window_notification_new( const char * application );
 void elix_window_notification_watch( elix_window_notification & note);
+
+elix_window_notification_message * elix_window_notification_add( elix_window_notification & handler, elix_window_notification_settings & setting, void (*callback) (elix_window_notification_message * data), void * data );
+void elix_window_notification_message_delete( /*elix_window_notification_message*/ void  * message);
+
+void elix_window_notification_tick( elix_window_notification & note );
 void elix_window_notification_close( elix_window_notification & note);
+
+elix_window_notification_settings elix_window_notification_settings_create( char * subject,  char * action_name, char* action_text,  char* body, ... );

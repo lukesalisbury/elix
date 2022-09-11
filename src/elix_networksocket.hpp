@@ -14,6 +14,8 @@
 	#define MSG_DONTWAIT 0
 	#define NATIVE_BUFFER_TYPE(x) (char*)x
 	#define NATIVE_LENGTH_TYPE(x) (int*)x
+
+	#define elix_socket_handle int
 #else
 	#include <sys/socket.h>
 	#include <netinet/in.h>
@@ -24,7 +26,11 @@
 	#include <errno.h>
 	#define NATIVE_BUFFER_TYPE(x) x
 	#define NATIVE_LENGTH_TYPE(x) x
+	#define elix_socket_handle int
 #endif
+
+//#define IPOCTALTOLONG(a,b,c,d) d | (c << 8) | (b << 16) | (a << 24)
+
 
 union elix_ipaddress {
 	struct  {
@@ -52,6 +58,7 @@ struct elix_network_interface {
 struct elix_network_peer {
 	elix_ipaddress ip;
 	uint16_t port;
+	elix_socket_handle socket_handle;
 };
 
 inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
@@ -64,12 +71,12 @@ inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
 	return 1;
 }
 
-inline void elix_memcopy( const void * p1, const void * p2, size_t size ) {
-	uint8_t * a = (uint8_t *)p1, * b = (uint8_t *)p2;
+inline size_t elix_memcopy( const void * dest, const void * src, size_t size ) {
+	uint8_t * a = (uint8_t *)dest, * b = (uint8_t *)src;
 	for (size_t i = 0; i < size; ++i) {
 		 a[i] = b[i];
 	}
-
+	return size;
 }
 
 inline sockaddr_in elix_network_socket_address(elix_network_peer & peer) {
@@ -179,7 +186,7 @@ inline elix_network_interface * elix_network_gather_ip_addresses() {
 inline void elix_network_init() {}
 inline void elix_network_deinit() {}
 
-inline elix_network_interface * elix_network_gather_ip_addresses() {
+inline elix_network_interface * elix_network_gather_ip_addresses( uint8_t public_only = 0) {
 	ifaddrs * list_if = nullptr, * current_if;
 	char addr_buffer[NI_MAXHOST] = "";
 	elix_network_interface * interfaces = nullptr, * new_interface = nullptr;
@@ -192,9 +199,10 @@ inline elix_network_interface * elix_network_gather_ip_addresses() {
 				len = sizeof (sockaddr_in);
 				sockaddr_in * addr = (sockaddr_in*)current_if->ifa_addr;
 
-				if ( addr->sin_addr.s_addr == INADDR_LOOPBACK ) {
+				if ( addr->sin_addr.s_addr == htonl(INADDR_LOOPBACK) ) {
 					goto skip;
 				}
+				
 				current_ip.ip4.ip = addr->sin_addr.s_addr;
 			} else if ( current_if->ifa_addr->sa_family == AF_INET6 ) {
 				len = sizeof (sockaddr_in6);
@@ -210,6 +218,14 @@ inline elix_network_interface * elix_network_gather_ip_addresses() {
 			}
 
 			getnameinfo(current_if->ifa_addr, len, addr_buffer, NI_MAXHOST, nullptr, 0, NI_NUMERICHOST);
+
+			if ( public_only ) {
+				///TODO: Fix quick hack
+				if ( current_ip.ip4.octel[0] == 0 ) {
+					//LOG_INFO("Skipping: %d.%d.%d.%d", current_ip.ip4.octel[0], current_ip.ip4.octel[1], current_ip.ip4.octel[2], current_ip.ip4.octel[3], current_ip.ip4.ip, INADDR_LOOPBACK);
+					goto skip;
+				}
+			}
 
 
 			new_interface = new elix_network_interface();
@@ -309,6 +325,26 @@ class elix_networksocket {
 		}
 		return false;
 	}
+	#if !defined (INVALID_SOCKET)
+	#define INVALID_SOCKET -1
+	#endif
+	uint8_t listen_for_message(elix_network_peer & remote_peer) {
+		if ( socket_type != TCP ) {
+			return 0;
+		}
+		int read = 0;
+		sockaddr_in remote = {};
+		socklen_t remote_size = sizeof(remote);
+		int peer_socket = 0;
+		peer_socket = ::accept(socket_handle, (sockaddr*)&remote, &remote_size);
+		if ( peer_socket != INVALID_SOCKET ) {
+
+			remote_peer = elix_network_ip_address(remote);
+			remote_peer.socket_handle = peer_socket;
+			return 1;
+		}
+		return 0;
+	}
 
 	uint8_t receive_message(elix_allocated_buffer & buffer, elix_network_peer & remote_peer ) {
 
@@ -316,15 +352,28 @@ class elix_networksocket {
 		sockaddr_in remote;
 		socklen_t remote_size = sizeof(remote);
 
+		buffer.actual_size = 0;
+
 		if ( socket_type == TCP ) {
-			read = recvfrom(socket_handle, NATIVE_BUFFER_TYPE(buffer.data), buffer.data_size, MSG_DONTWAIT, (sockaddr*)&remote, NATIVE_LENGTH_TYPE(&remote_size));
+			//read = recvfrom(socket_handle, NATIVE_BUFFER_TYPE(buffer.data), buffer.data_size, MSG_DONTWAIT, (sockaddr*)&remote, NATIVE_LENGTH_TYPE(&remote_size));
+
+			// Server mode, use peer socket handle otherwise
+			if ( remote_peer.socket_handle != INVALID_SOCKET ) {
+				read = recv(remote_peer.socket_handle, buffer.data, buffer.data_size, MSG_DONTWAIT);
+			} else {
+				read = recv(socket_handle, buffer.data, buffer.data_size, MSG_DONTWAIT);
+			}
+
 			if (read > 0) {
-				LOG_INFO( "Sockect Read: %d Bytes", read);
+				buffer.actual_size = read;
+				//LOG_INFO( "Sockect Read: %d Bytes", read);
 			} else if ( read < 0 ) {
 				//LOG_INFO( "IPPROTO_UDP Bind Error: %s", std::strerror(errno) <<  std::endl;
 			}
 		} else if ( socket_type == UDP) {
 			read = recvfrom(socket_handle, NATIVE_BUFFER_TYPE(buffer.data), buffer.data_size, 0, (sockaddr*)&remote, NATIVE_LENGTH_TYPE(&remote_size));
+			buffer.actual_size = read;
+			remote_peer = elix_network_ip_address(remote);
 		}
 
 		remote_peer = elix_network_ip_address(remote);
@@ -355,8 +404,8 @@ class elix_networksocket {
 			LOG_INFO( "Send Error: %s", std::strerror(errno) );
 		}
 
-		LOG_INFO("Sending Message to: %d.%d.%d.%d", target.ip.ip4.octel[0], target.ip.ip4.octel[1], target.ip.ip4.octel[2], target.ip.ip4.octel[3]);
-		LOG_INFO("Results: %d ", results );
+		//LOG_INFO("Sending Message to: %d.%d.%d.%d", target.ip.ip4.octel[0], target.ip.ip4.octel[1], target.ip.ip4.octel[2], target.ip.ip4.octel[3]);
+		//LOG_INFO("Results: %d ", results );
 		return 0;
 	}
 
