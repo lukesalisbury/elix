@@ -141,6 +141,25 @@ size_t elix_cstring_find_of(const char * str, const char * search, size_t offset
 	return SIZE_MAX;
 }
 
+size_t elix_cstring_find_last_of(const char * str, const char * search, size_t offset) {
+	size_t length = elix_cstring_length(str, 0);
+	size_t sl = elix_cstring_length(search, 0);
+	for (size_t c = length - sl; c > offset; c--) {
+		bool found = false;
+		for (size_t sc = 0; sc < sl; sc++) {
+			if ( str[c+sc] == search[sc]) {
+				found = (sc == sl-1);
+			} else {
+				break;
+			}
+		}
+		if ( found ) {
+			return c;
+		}
+	}
+	return SIZE_MAX;
+}
+
 size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const char *search, const char *replace) {
 	//NOTE: This is slow, and not a good implemenation
 	//TODO: Check for overflow
@@ -291,4 +310,62 @@ uint32_t elix_cstring_next_character(char *& object) {
 
 uint32_t elix_cstring_peek_character(char * object) {
 	return elix_cstring_next_character(object);
+}
+
+
+
+char ** elix_cstring_split( const char * source, char token, char string_bracket) {
+	#define token_cache 8
+	size_t source_len = elix_cstring_length(source, 0);
+	size_t tokens = 0;
+	size_t position[token_cache] = {0};
+	size_t maxlength = 0, last_token = 0;
+	uint8_t outside_string = 1;
+	for (size_t i = 0; i < source_len; i++)	{
+		if ( source[i] == token ) {
+			if ( outside_string ) {
+				maxlength = (i - last_token) > maxlength ? (i - last_token) : maxlength;
+				last_token = i;
+				if (tokens < token_cache ) {
+					position[tokens] = last_token + 1;
+				}
+				tokens++;
+			}
+		} else if ( source[i] == string_bracket ) {
+			outside_string = !outside_string;
+		}
+	}
+	position[tokens] = source_len+1;
+	tokens++;
+
+	char ** output = malloc((tokens+1) * sizeof(char *));
+	if (tokens > token_cache ) {
+		//TODO
+	} else {
+		last_token = 0;
+		for (size_t i = 0; i < tokens; i++)	{
+			output[i] = elix_cstring_from(source + last_token, "", position[i] - last_token);
+			//LOG_INFO("%d > %d - '%s'", last_token, position[i], output[i]);
+			last_token = position[i];
+		}
+		output[tokens] = nullptr;
+	}
+	return output;
+	#undef token_cache
+}
+
+size_t elix_cstring_dequote( char * string ) {
+	size_t length = elix_cstring_length(string, 0);
+
+	while( length && string[0] == '"' ) {
+		memmove(string, string + 1, length);
+		length--;
+	}
+	size_t pos = length ? length-1 : 0;
+	while( pos && string[pos] == '"' ) {
+		string[pos] = 0;
+		length--;
+		pos--;
+	}
+	return length;
 }
