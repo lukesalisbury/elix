@@ -40,7 +40,7 @@ void elix_string_clear(elix_string & str) {
 
 void elix_string_append_byte(elix_string & str, uint8_t byte ) {
 	//resize string
-	if ( str.length < str.allocated - 1 ) {
+	if ( str.length >= str.allocated - 1 ) {
 		void * newptr = realloc(str.text, str.allocated + 8 );
 		if ( !newptr ) {
 			LOG_ERROR("String couldn't be resized");
@@ -124,12 +124,14 @@ elix_character elix_character_next( elix_string_buffer * text )
 	char8 = (*text->iter);
 	if ( char8 < 128 ) {
 		char32.value = char8;
+		
 		char32.codepage = 0; //ASCII
 	} else if ( char8 > 193 && char8 < 224 ) {
 		elix_string_buffer_forward(text);
 		next = (*text->iter);
 
 		char32.value = ((char8 << 6) & 0x7ff) + (next & 0x3f);
+		char32.bytes = 2;
 	} else if ( char8 > 223 && char8 < 240 ) {
 		elix_string_buffer_forward(text);
 		next = (*text->iter) & 0xff;
@@ -138,6 +140,7 @@ elix_character elix_character_next( elix_string_buffer * text )
 		elix_string_buffer_forward(text);
 		next = (*text->iter) & 0x3f;
 		char32.value += next;
+		char32.bytes = 3;
 	} else if ( char8 > 239 && char8 < 245 ) {
 		elix_string_buffer_forward(text);
 		next = (*text->iter) & 0xff;
@@ -150,9 +153,10 @@ elix_character elix_character_next( elix_string_buffer * text )
 		elix_string_buffer_forward(text);
 		next = (*text->iter) & 0x3f;
 		char32.value += next;
-
+		char32.bytes = 4;
 	} else {
 		char32.value = 0xFFFD;
+		char32.bytes = 2; ///TODO: Might be wrong
 	}
 	elix_string_buffer_forward(text);
 	return char32;
@@ -176,6 +180,12 @@ enum elix_html_element_type {
 };
 enum elix_html_parse_state { PARSE_NONE, PARSE_TAG,PARSE_START_TAG,PARSE_END_TAG, PARSE_ATTRIBUTE, PARSE_COMMENT, PARSE_SCAN_DOCTYPE, PARSE_SCAN_CDATA, PARSE_SCAN_COMMENT, PARSE_SCAN_TEXT, PARSE_ERROR = 0xFF};
 
+
+static char * elix_html_parse_state_names[] = {"PARSE_NONE", "PARSE_TAG","PARSE_START_TAG","PARSE_END_TAG", "PARSE_ATTRIBUTE", "PARSE_COMMENT", "PARSE_SCAN_DOCTYPE", "PARSE_SCAN_CDATA", "PARSE_SCAN_COMMENT", "PARSE_SCAN_TEXT", "PARSE_ERROR"};
+
+#define PARSE_NAME(s) (s <= PARSE_SCAN_TEXT && s >= PARSE_NONE ? elix_html_parse_state_names[s] : elix_html_parse_state_names[10])
+
+
 struct elix_string_match {
 	uint32_t string[7];
 	union {
@@ -197,7 +207,7 @@ static elix_string_match comment_end = { {'-','-', '>'}, {3}, PARSE_NONE };
 static elix_string_match cdata_start = { {'[','C','D','A','T','A','['}, {7}, PARSE_SCAN_CDATA };
 static elix_string_match cdata_end = { {']',']','>'}, {3}, PARSE_NONE };
 
-#define STATECHANGE(Q, D) Q;// printf("%d: " #Q "\n", D);
+#define STATECHANGE(Q, D) Q;// printf("%*s]" #Q "\n", D, " ");
 inline bool isOpenTagChar(uint32_t c) {
 	return ( c == '<');
 }
@@ -236,11 +246,12 @@ inline bool doesStringMatch(uint32_t c, elix_html_parse_next_info & info, elix_s
 		if ( results == PARSE_NONE ) {
 			results = needle.result;
 		} else if ( results != needle.result ) {
-			//printf("doesStringMatch mode switched\n");
+			//printf("doesStringMatch mode switched %s to %s\n", PARSE_NAME(results), PARSE_NAME(needle.result));
 		}
 		if ( info.index ==  needle.size -1 ) {
 			results = needle.result;
 		}
+		//printf("doesStringMatch %d\n ", results);
 		return true;
 	} else {
 		return false;
@@ -264,8 +275,17 @@ inline elix_html_node elix_html_node_push(elix_html_node current_node, elix_html
 	return next_node;
 }
 
+inline elix_html_node elix_html_node_push_text(elix_html_node current_node, elix_html_document & doc, elix_html_status & current, size_t &text_length) {
+	elix_html_node next_node = elix_html_node_push(current_node,doc);
+	memcpy(next_node.get()->name, "TextNode", 9);
+	next_node.get()->type = ELEMENT_RAWTEXT;
+	next_node.get()->textContent = elix_string_buffer_get_pointer(doc.reference, current.offset - text_length, text_length);
+	text_length = 0;
+	return next_node;
+}
 
-inline elix_html_node elix_html_element_node_pop(elix_html_node current_node, elix_html_document & doc, elix_string & buffer) {
+
+inline elix_html_node elix_html_node_push_element(elix_html_node current_node, elix_html_document & doc, elix_string & buffer) {
 	elix_html_node next_node = elix_html_node_push(current_node,doc);
 	memcpy(next_node.get()->name, buffer.text, 16);
 	next_node.get()->type = ELEMENT_NORMAL;
@@ -273,18 +293,15 @@ inline elix_html_node elix_html_element_node_pop(elix_html_node current_node, el
 	return next_node;
 }
 
-inline elix_html_node elix_html_void_node_pop(elix_html_node current_node, elix_html_document & doc, elix_string & buffer, elix_html_status & current) {
+inline elix_html_node elix_html_node_push_void(elix_html_node current_node, elix_html_document & doc, elix_string & buffer, elix_html_status & current) {
 	elix_html_node next_node = elix_html_node_push(current_node,doc);
 
-	elix_html_status doc_pos;
-	doc_pos.offset = current.offset-2-buffer.length;
-	doc_pos.length = buffer.length;
 	next_node.get()->textContent = elix_string_buffer_get_pointer(doc.reference, current.offset - 2 - buffer.length, buffer.length);
 	next_node.get()->type = ELEMENT_VOID;
 	return next_node;
 }
 
-inline elix_html_node elix_html_node_pop(elix_html_node current_node) {
+inline elix_html_node elix_html_node_parent(elix_html_node current_node) {
 	return current_node.get()->parent;
 }
 
@@ -319,26 +336,34 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
     //Set up pointer to current character
     doc.reference->iter = doc.reference->data + current.offset;
 
-	size_t d = 0;
+	int d = 0;
+	size_t text_length = 0;
 	elix_html_parse_next_info reset_parse_next_info;
 	elix_html_parse_next_info comment_next;
 	elix_html_parse_next_info scan_next;
 
 	do {
 		char32 = elix_character_next(doc.reference);
+		if ( char32.value > 0xFF) {
+			int q = 0;
+		}
+
 		if ( char32.value ) {
 			switch (state) {
 				case PARSE_TAG: {
 					if ( isVoidTagChar(char32.value) ) {
+						/* / */ 
 						state = STATECHANGE(PARSE_END_TAG, d);
 					} else if ( isValidNameChar(char32.value, !buffer.length) ) {
+						/* a-z, if not first 0-9 also */
 						state = STATECHANGE(PARSE_START_TAG, d);
 						elix_string_append( buffer, char32.value);
-
 					} else if ( char32.value == '!') {
+						/* Comment <! >*/
 						state = STATECHANGE(PARSE_COMMENT, d);
 						comment_next = reset_parse_next_info;
 					} else {
+						/* Namespaces not supported*/
 						state = STATECHANGE(PARSE_ERROR, d);
 						printf("Error Parsing Tag at char " pZU "\n", current.offset);
 						return current;
@@ -347,17 +372,22 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
 				}
 				case PARSE_START_TAG: {
 					if ( isValidNameChar(char32.value, 0) ) {
+						/* a-z or 0-9 */
 						state = STATECHANGE(PARSE_START_TAG, d);
 						elix_string_append( buffer, char32.value);
 					} else if ( char32.value == ' ' ) {
-						current_node = elix_html_element_node_pop(current_node, doc,buffer);
+						/* If space switch to attributes*/
+						current_node = elix_html_node_push_element(current_node, doc, buffer);
 						state = STATECHANGE(PARSE_ATTRIBUTE, d);
 					} else if ( char32.value == '>' ) {
-						current_node = elix_html_element_node_pop(current_node, doc,buffer);
+						// finish opening tag
+						current_node = elix_html_node_push_element(current_node, doc, buffer);
 						state = STATECHANGE(PARSE_NONE, d);
 						d++;
 					} else {
-
+						state = STATECHANGE(PARSE_ERROR, d);
+						printf("Error Parsing Tag at char " pZU "\n", current.offset);
+						return current;
 					}
 					break;
 				}
@@ -379,8 +409,8 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
 						if ( state == PARSE_SCAN_COMMENT ) {
 							scan_next.index++;
 						} else {
-							current_node = elix_html_void_node_pop(current_node, doc, buffer, current);
-							current_node = elix_html_node_pop(current_node);
+							current_node = elix_html_node_push_void(current_node, doc, buffer, current);
+							current_node = elix_html_node_parent(current_node);
 							state = STATECHANGE(PARSE_NONE, d);
 						}
 					} else {
@@ -403,8 +433,8 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
 						if ( state == PARSE_SCAN_CDATA ) {
 							scan_next.index++;
 						} else {
-							current_node = elix_html_void_node_pop(current_node, doc, buffer, current);
-							current_node = elix_html_node_pop(current_node);
+							current_node = elix_html_node_push_void(current_node, doc, buffer, current);
+							current_node = elix_html_node_parent(current_node);
 							state = STATECHANGE(PARSE_NONE, d);
 						}
 					} else {
@@ -456,32 +486,42 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
 					} else if ( char32.value == '>' ) {
 						state = STATECHANGE(PARSE_NONE, d);
 						current_node.get()->textContent.length = buffer.length;
-						current_node = elix_html_node_pop(current_node);
+						current_node = elix_html_node_parent(current_node);
 						
 						elix_string_clear(buffer);
 						d--;
+					} else {
+						state = STATECHANGE(PARSE_ERROR, d);
+						LOG_MESSAGE("Error Parsing Tag at char " pZD "\n%.*s\n%*c^\n", current.offset, current.offset < 4 ? 0 : current.offset - 4, doc.reference->iter, current.offset < 4 ? current.offset-1 : 3, '-' );
+						return current;
 					}
+					break;
+				}
+				case PARSE_SCAN_TEXT: {
+					if ( isOpenTagChar(char32.value) ) {
+						current_node = elix_html_node_push_text(current_node, doc, current, text_length);
+						current_node = elix_html_node_parent(current_node);
+						state = STATECHANGE(PARSE_TAG, d);
+						elix_string_clear(buffer);
+					} else {
+						text_length += char32.bytes;
+					}					
 					break;
 				}
 				default: {
 					if ( isOpenTagChar(char32.value) ) {
-						if ( state == PARSE_SCAN_TEXT) {
-							current_node = elix_html_node_push(current_node, doc);
-							memcpy(current_node.get()->name, "TextNode", 9);
-							current_node.get()->type = ELEMENT_RAWTEXT;
-							current_node.get()->textContent = elix_string_buffer_get_pointer(doc.reference, doc.reference->location, 1);
-							current_node = elix_html_node_pop(current_node);
-						}
 						state = STATECHANGE(PARSE_TAG, d);
 						elix_string_clear(buffer);
 					} else {
 						state = STATECHANGE(PARSE_SCAN_TEXT, d);
-						elix_string_append( buffer, char32.value );
+						elix_string_clear(buffer);
+						text_length += char32.bytes;
 					}
+					break;
 				}
 			}
 		}
-		current.offset++;
+		current.offset += char32.bytes;
 	} while (char32.value && current.offset < current.length );
 
 	return current;
@@ -499,7 +539,6 @@ elix_html_document elix_html_open(elix_string_buffer & content) {
 
     if ( content.data[first_character] == '<' ) {
 		printf("html source file\n");
-
         ///NOTE: Reference may be freed elsewhere
 		doc.reference = &content;
 	} else {
@@ -512,21 +551,42 @@ elix_html_document elix_html_open(elix_string_buffer & content) {
 void elix_html_printNode(elix_html_node * node, size_t & d) {
 	ASSERT(node);
 	for (size_t var = 0; var < d; ++var) {
-		printf("\t");
+		printf(" ");
 	}
 	elix_html_node_object * obj = node->get();
+/*
+	ELEMENT_FOREIGN,
+	ELEMENT_VOID,
+	ELEMENT_TEMPLATE,
+	ELEMENT_RAWTEXT,
+	ELEMENT_RAWTEXTAREA,
+	ELEMENT_NORMAL
+*/
 
 	switch (obj->type) {
 		case ELEMENT_RAWTEXT:
 			if (obj->textContent.length)
-				printf("> '%.*s'\n", obj->textContent.length, obj->textContent.string);
+				printf("(TEXT)'%.*s'\n", obj->textContent.length, obj->textContent.string);
+			break;
+		case ELEMENT_RAWTEXTAREA:
+			if (obj->textContent.length)
+				printf(">> '%.*s'\n", obj->textContent.length, obj->textContent.string);
 			break;
 		case ELEMENT_VOID:
 			if (obj->textContent.length)
-				printf("'%.*s'\n", obj->textContent.length, obj->textContent.string);
+				printf("(ELEMENT_VOID) '%.*s'\n", obj->textContent.length, obj->textContent.string);
+			break;
+		case ELEMENT_NORMAL:
+			printf("[%s]\n", obj->name);
+			break;
+		case ELEMENT_FOREIGN:
+			printf("(ELEMENT_FOREIGN:%s)\n", obj->name);
+			break;
+		case ELEMENT_TEMPLATE:
+			printf("(ELEMENT_TEMPLATE:%s)\n", obj->name);
 			break;
 		default:
-			printf("[%s]\n", obj->name);
+			printf("(:%s)\n", obj->name);
 			break;
 	}
 

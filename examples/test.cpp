@@ -113,7 +113,7 @@ void test_elix_html() {
 
 	elix_string_buffer test_html = elix_string_buffer_new(R"TEXT(<!DOCTYPE html><html>
 	<!-- Commement --><body>Hello <![CDATA[ sdaghkl
- asd]] ]]> 🐨 World 🐱‍🚀<div><div></div></div></body></html>)TEXT", 512);
+ asd]] ]]> 🐨 World 🐱‍🚀<div><div>test</div>🐨</div></body></html>)TEXT", 512);
 
 	LOG_MESSAGE("%*s", test_html.length, test_html.data);
 	LOG_MESSAGE("--------------------------------------------------------");
