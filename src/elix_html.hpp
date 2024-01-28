@@ -18,68 +18,63 @@ it and redistribute it freely, subject to the following restrictions:
 #define ELIX_HTML_HPP
 
 #include "elix_core.h"
-#include "elix_rendertree.hpp"
-
-#include <string>
-#include <vector>
 #include <memory>
-typedef std::basic_string<uint8_t> elix_sstring;
+#include <vector>
 
-namespace elix {
-	struct string_pointer {
-		std::string * reference;
-		bool ownReference = false;
-		size_t offset;
-		size_t length;
-	};
-	struct character {
-		uint32_t value;
-		uint8_t bytes;
-		uint8_t padding;
-		uint16_t codepage;
-	};
 
-	character getNextCharacter( std::string::iterator & text );
 
-	namespace html {
-		struct node_object;
-		typedef std::shared_ptr<node_object> node;
-		struct attr {
-			std::string name;
-			std::string value;
-		};
-		struct node_object {
-			uint8_t type = 0;
-			char name[16];
-			string_pointer source;
-			node parent;
-			std::vector<node> children;
-			std::vector<attr> attribute;
-			std::string textContent;
-			elix_rendertree_item render_item;
-		};
+struct elix_htmlstring_pointer {
+	elix_string_buffer * source;
+	uint8_t * string;
+	size_t offset;
+	size_t length;
+};
 
-		struct document {
-			std::vector<node> nodes;
-			std::string reference;
-			elix_rendertree rendertree;
-			node root;
-		};
 
-		struct status {
-			size_t offset = 0;
-			size_t length = 0;
-		};
 
-		elix::html::status parse(elix::html::document & doc, elix::html::status * lastStatus = nullptr);
-		elix::html::document open(std::string content);
-		void print(document * doc);
-		void close(elix::html::document & doc);
 
-		elix_rendertree build_render_tree(document * doc, elix_uv32_2 dimension);
-		void clear_render_tree(document * doc);
+struct elix_character {
+	uint32_t value;
+	uint8_t bytes;
+	uint8_t padding;
+	uint16_t codepage; //0 = ASCII, elsewise Unicode
+};
 
-	}
-}
+struct elix_html_node_object;
+typedef std::shared_ptr<elix_html_node_object> elix_html_node;
+
+struct elix_html_attr {
+	elix_htmlstring_pointer name;
+	elix_htmlstring_pointer value;
+};
+struct elix_html_node_object {
+	uint8_t type = 0;
+	char name[16];
+	elix_htmlstring_pointer source;
+	elix_html_node parent;
+	std::vector<elix_html_node> children;
+	std::vector<elix_html_attr> attribute;
+	elix_htmlstring_pointer textContent;
+};
+
+
+struct elix_html_status {
+	size_t offset = 0;
+	size_t length = 0;
+};
+
+
+struct elix_html_document {
+	std::vector<elix_html_node> nodes;
+	elix_string_buffer * reference;
+	elix_html_node root;
+};
+
+elix_html_document elix_html_open(elix_string_buffer & data);
+elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * lastStatus = nullptr);
+void elix_html_print(elix_html_document * doc);
+void elix_html_close(elix_html_document * doc);
+
+
 #endif // ELIX_HTML_HPP
 

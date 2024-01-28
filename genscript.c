@@ -4,6 +4,8 @@
  * run: genscript.exe [-help]
  * 
  * 
+ * Modules
+ *  If first line is $static or $shared it will be build as such 
 *************************************************************************/
 #include <stdio.h>
 #include <stdint.h>

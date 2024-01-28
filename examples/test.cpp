@@ -12,7 +12,7 @@
 static elix_fpscounter fps;
 static elix_program_info program_info;
 
-uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
+//uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
 
 
 void update_buffer_randomly(elix_graphic_data * buffer) {
@@ -65,7 +65,7 @@ void test_elix_endian() {
 	LOG_MESSAGE("--------------------------------------------------------");
 }
 
-
+/*
 void test_elix_rendertree() {
 	LOG_MESSAGE("--------------------------------------------------------");
 	LOG_MESSAGE("--- Elix Rendertree ------------------------------------");
@@ -91,25 +91,41 @@ void test_elix_rendertree() {
 	delete w;
 
 }
+*/
+elix_string_buffer elix_string_buffer_new(char * string, size_t length) {
+    elix_string_buffer str;
+	if ( length >= __UINT16_MAX__ || string == nullptr || length == 0) {
+		///TODO: Handle long text
+		return str;
+	}
+    str.length = elix_cstring_length(string);
+    str.allocated = length + 1;
+    str.data = (uint8_t*)calloc(1, str.allocated);
+	memcpy(str.data, string, str.length);
+	str.iter = str.data;
+	str.location = 0;
+    return str;
+}
 
 void test_elix_html() {
 	LOG_MESSAGE("--------------------------------------------------------");
 	LOG_MESSAGE("--- Elix HTML Parser -----------------------------------");
 
-	std::string test_html(R"TEXT(<!DOCTYPE html><html>
+	elix_string_buffer test_html = elix_string_buffer_new(R"TEXT(<!DOCTYPE html><html>
 	<!-- Commement --><body>Hello <![CDATA[ sdaghkl
- asd]] ]]> 🐨 World 🐱‍🚀<div><div></div></div></body></html>)TEXT");
+ asd]] ]]> 🐨 World 🐱‍🚀<div><div></div></div></body></html>)TEXT", 512);
 
-	LOG_MESSAGE("%s", test_html.c_str());
+	LOG_MESSAGE("%*s", test_html.length, test_html.data);
 	LOG_MESSAGE("--------------------------------------------------------");
-	elix::html::document html = elix::html::open(test_html);
-	elix::html::print(&html);
+	elix_html_document html = elix_html_open(test_html);
+	elix_html_print(&html);
 
+/*
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
-	elix_rendertree tree = elix::html::build_render_tree(&html, bitmap_context->dimensions);
-	elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
+	//elix_rendertree tree = elix::html::build_render_tree(&html, bitmap_context->dimensions);
+	//elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
 	while(elix_os_window_handle_events(w) ) {
 		if ( w->flags & EOE_WIN_CLOSE ) {
 			elix_os_window_destroy(w);
@@ -123,6 +139,7 @@ void test_elix_html() {
 
 	elix_os_window_destroy( w );
 	delete w;
+*/
 }
 
 void test_elix_os_window() {

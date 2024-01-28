@@ -52,6 +52,8 @@
 
 
 typedef void* data_pointer; // uintptr_t
+typedef uint32_t bool32;
+typedef uint16_t bool16;
 
 union elix_colour {
 	uint32_t hex;
@@ -88,9 +90,21 @@ struct elix_graphic_data {
 };
 
 struct elix_string {
-	uint16_t length;
-	uint16_t allocated;
-	uint8_t * data;
+	uint8_t * text = nullptr;
+	bool16 owned = true;
+	uint16_t length = 0;
+	uint16_t allocated = 0;
+	uint16_t location = 0;
+};
+
+
+struct elix_string_buffer {
+	uint8_t * data = nullptr;
+	uint8_t * iter = nullptr;
+	bool16 owned = true;
+	uint16_t length = 0;
+	uint16_t allocated = 0;
+	uint16_t location = 0;
 };
 
 struct elix_databuffer {
@@ -156,8 +170,6 @@ inline elix_graphic_data * elix_graphic_data_destroy(elix_graphic_data * buffer)
 	}
 	return buffer;
 }
-
-
 
 inline void elix_databuffer_free(elix_databuffer * data) {
 	NULLIFY(data->data);

@@ -16,6 +16,7 @@
 
 #include "elix_cstring.hpp"
 #include <string.h>
+#include <stdlib.h>
 
 char * elix_cstring_substr( const char * source, ssize_t pos, ssize_t len ) {
 	ASSERT(source != nullptr)
@@ -338,7 +339,7 @@ char ** elix_cstring_split( const char * source, char token, char string_bracket
 	position[tokens] = source_len+1;
 	tokens++;
 
-	char ** output = malloc((tokens+1) * sizeof(char *));
+	char ** output = (char**)malloc((tokens+1) * sizeof(char *));
 	if (tokens > token_cache ) {
 		//TODO
 	} else {
