@@ -178,10 +178,10 @@ enum elix_html_element_type {
 	ELEMENT_RAWTEXTAREA,
 	ELEMENT_NORMAL
 };
-enum elix_html_parse_state { PARSE_NONE, PARSE_TAG,PARSE_START_TAG,PARSE_END_TAG, PARSE_ATTRIBUTE, PARSE_COMMENT, PARSE_SCAN_DOCTYPE, PARSE_SCAN_CDATA, PARSE_SCAN_COMMENT, PARSE_SCAN_TEXT, PARSE_ERROR = 0xFF};
+enum elix_html_parse_state { PARSE_NONE, PARSE_TAG,PARSE_START_TAG,PARSE_END_TAG, PARSE_ATTRIBUTE_KEY, PARSE_ATTRIBUTE, PARSE_COMMENT, PARSE_SCAN_DOCTYPE, PARSE_SCAN_CDATA, PARSE_SCAN_COMMENT, PARSE_SCAN_TEXT, PARSE_ERROR = 0xFF};
 
 
-static char * elix_html_parse_state_names[] = {"PARSE_NONE", "PARSE_TAG","PARSE_START_TAG","PARSE_END_TAG", "PARSE_ATTRIBUTE", "PARSE_COMMENT", "PARSE_SCAN_DOCTYPE", "PARSE_SCAN_CDATA", "PARSE_SCAN_COMMENT", "PARSE_SCAN_TEXT", "PARSE_ERROR"};
+static char * elix_html_parse_state_names[] = {"PARSE_NONE", "PARSE_TAG","PARSE_START_TAG","PARSE_END_TAG", "PARSE_ATTRIBUTE_KEY", "PARSE_ATTRIBUTE", "PARSE_COMMENT", "PARSE_SCAN_DOCTYPE", "PARSE_SCAN_CDATA", "PARSE_SCAN_COMMENT", "PARSE_SCAN_TEXT", "PARSE_ERROR"};
 
 #define PARSE_NAME(s) (s <= PARSE_SCAN_TEXT && s >= PARSE_NONE ? elix_html_parse_state_names[s] : elix_html_parse_state_names[10])
 
@@ -378,7 +378,8 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
 					} else if ( char32.value == ' ' ) {
 						/* If space switch to attributes*/
 						current_node = elix_html_node_push_element(current_node, doc, buffer);
-						state = STATECHANGE(PARSE_ATTRIBUTE, d);
+						state = STATECHANGE(PARSE_ATTRIBUTE_KEY, d);
+						elix_string_clear(buffer);
 					} else if ( char32.value == '>' ) {
 						// finish opening tag
 						current_node = elix_html_node_push_element(current_node, doc, buffer);
@@ -508,6 +509,76 @@ elix_html_status elix_html_parse(elix_html_document & doc, elix_html_status * la
 					}					
 					break;
 				}
+				case PARSE_ATTRIBUTE_KEY: {
+					/*
+					 if isValidNameChar set as name, if > name & tag if finished. = switch to valve scan
+					*/
+					if ( char32.value == '>' ) {
+						//close attr
+						if ( buffer.length ) {
+							elix_html_attr new_attribute;
+							new_attribute.name = elix_string_buffer_get_pointer(doc.reference, current.offset - buffer.length, buffer.length);
+							new_attribute.value = {nullptr, nullptr, 0,0};
+							current_node.get()->attribute.push_back(new_attribute);
+
+							//printf("[>] name:'%.*s'\n", new_attribute.name.length, new_attribute.name.string);
+							elix_string_clear(buffer);
+						}
+						state = STATECHANGE(PARSE_NONE, d);
+					} else if ( isValidNameChar(char32.value, !buffer.length) ) {
+						elix_string_append( buffer, char32.value );
+					} else if ( char32.value == ' ' ) {
+						///NOTE:  
+						//If buffer has content, space ends it.
+						if ( buffer.length ) {
+							elix_html_attr new_attribute;
+							new_attribute.name = elix_string_buffer_get_pointer(doc.reference, current.offset - buffer.length, buffer.length);
+							new_attribute.value = {nullptr, nullptr, 0,0};
+							current_node.get()->attribute.push_back(new_attribute);
+							//printf("[ ] name:'%.*s'\n", new_attribute.name.length, new_attribute.name.string);
+							elix_string_clear(buffer);
+						}
+					} else if ( char32.value == '=' ) {
+						elix_html_attr new_attribute;
+						new_attribute.name = elix_string_buffer_get_pointer(doc.reference, current.offset - buffer.length, buffer.length);
+						new_attribute.value = {nullptr, nullptr, 0,0};
+						current_node.get()->attribute.push_back(new_attribute);
+						//printf("[=] name:'%.*s' %s\n", new_attribute.name.length, new_attribute.name.string, buffer.text);
+						elix_string_clear(buffer);
+						state = STATECHANGE(PARSE_ATTRIBUTE, d);
+					} else {
+						state = STATECHANGE(PARSE_ERROR, d);
+						LOG_MESSAGE("Error Parsing Attribute at char " pZD "\n%.*s\n%*c^\n", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc.reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+						return current;
+					}					
+					break;
+				}
+				case PARSE_ATTRIBUTE: {
+					//Get current attribute
+					if ( char32.value == '"' ) {
+						// Start or end value
+						if ( buffer.length ) {
+							elix_html_attr new_attribute = current_node.get()->attribute.back();
+							new_attribute.value = elix_string_buffer_get_pointer(doc.reference, current.offset - buffer.length, buffer.length + 1);
+							current_node.get()->attribute.pop_back();
+							current_node.get()->attribute.push_back(new_attribute);
+
+							elix_string_clear(buffer);
+							state = STATECHANGE(PARSE_ATTRIBUTE_KEY, d);
+
+							printf("[+] value:'%.*s' %s\n", (int)new_attribute.value.length, new_attribute.value.string, buffer.text);
+						} else {
+							elix_string_append( buffer, char32.value );
+						}
+					} else if ( buffer.length ) {
+						elix_string_append( buffer, char32.value );
+					} else {
+						state = STATECHANGE(PARSE_ERROR, d);
+						LOG_MESSAGE("Error Parsing Attribute at char " pZD "\n%.*s\n%*c^\n", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc.reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+						return current;
+					}							
+					break;
+				}
 				default: {
 					if ( isOpenTagChar(char32.value) ) {
 						state = STATECHANGE(PARSE_TAG, d);
@@ -566,18 +637,31 @@ void elix_html_printNode(elix_html_node * node, size_t & d) {
 	switch (obj->type) {
 		case ELEMENT_RAWTEXT:
 			if (obj->textContent.length)
-				printf("(TEXT)'%.*s'\n", obj->textContent.length, obj->textContent.string);
+				printf("(TEXT)'%.*s'\n", (int)obj->textContent.length, obj->textContent.string);
 			break;
 		case ELEMENT_RAWTEXTAREA:
 			if (obj->textContent.length)
-				printf(">> '%.*s'\n", obj->textContent.length, obj->textContent.string);
+				printf(">> '%.*s'\n", (int)obj->textContent.length, obj->textContent.string);
 			break;
 		case ELEMENT_VOID:
 			if (obj->textContent.length)
-				printf("(ELEMENT_VOID) '%.*s'\n", obj->textContent.length, obj->textContent.string);
+				printf("(ELEMENT_VOID) '%.*s'\n", (int)obj->textContent.length, obj->textContent.string);
 			break;
 		case ELEMENT_NORMAL:
-			printf("[%s]\n", obj->name);
+			if ( !obj->attribute.empty() ) {
+				printf("[%s", obj->name);
+				for (elix_html_attr a: obj->attribute) {
+					if ( a.value.length ) {
+						printf(" (%.*s", (int)a.name.length, a.name.string);
+						printf(":%.*s)", (int)a.value.length, a.value.string);
+					} else {
+						printf(" %.*s", (int)a.name.length, a.name.string);
+					}
+				}
+				printf("]\n");
+			} else {
+				printf("[%s]\n", obj->name);
+			}
 			break;
 		case ELEMENT_FOREIGN:
 			printf("(ELEMENT_FOREIGN:%s)\n", obj->name);

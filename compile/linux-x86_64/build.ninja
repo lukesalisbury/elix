@@ -3,7 +3,7 @@ builddir=compile/linux-x86_64/log
 compiler_lib = -lstdc++ -lm -lpthread -lwayland-client -ldbus-1 -lSDL2 
 compiler_lib_flags = -std=c++11 -g3 
 compiler_flags = -std=c++11 -g3 
-compiler_includes = -Isrc -Iinclude -I/usr/lib64/dbus-1.0/include/ -I/usr/include/dbus-1.0/ 
+compiler_includes = -Isrc -Iinclude -I/usr/lib64/dbus-1.0/include/ -I/usr/lib/x86_64-linux-gnu/dbus-1.0/include/ -I/usr/include/dbus-1.0/ 
 compller_defines = -DPLATFORM_LINUX -DPLATFORM_BITS=64 
 compiler_mode = debug
 finaliser_flags = 

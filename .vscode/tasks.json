@@ -32,7 +32,7 @@
 				"command": "c:/dev/ninja",
 				"args": ["2>&1"]
 			},
-			"dependsOn": "Touch",
+			//"dependsOn": "Touch",
 			"problemMatcher": ["$gcc"],
 			"group": {
 				"kind": "build",
