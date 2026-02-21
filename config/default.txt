@@ -12,13 +12,14 @@ finaliser=3dsxtool
 program_suffix=.elf
 finalise_suffix=.3dsx
 [commands]
-compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_flags} -o $out -c $in
-compile_c=${compiler} ${compiler_includes} ${compller_defines}  ${compiler_flags} -o $out -c $in
+compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_cpp_flags} ${compiler_flags} -o $out -c $in
+compile_c=${compiler} ${compiler_includes} ${compller_defines} ${compiler_c_flags} ${compiler_flags} -o $out -c $in
 link_shared=${linker} -shared ${compiler_lib_flags} $in -o ${binary_prefix}$out
-link_static=${static_linker} $out $in 
+link_static=${static_linker} ${object_dir}/$out $in 
 link=${linker} ${compiler_lib_flags} $in -o ${binary_prefix}$out ${compiler_lib} 
 finalise=${finaliser} ${finalise_flags} $in -o ${binary_prefix}$out
 build_resources=echo
 clean=rm -rf ${object_dir}
 [options]
 name=elix
+program_executable=test

@@ -1,8 +1,14 @@
 {
 	"triggerTaskOnSave.tasks": {
 		"Build": [
+			"*.c",
+			"*.cc",
 			"*.cpp",
-			"*.hpp"
+			"*.hpp",
+			"*.h"
+		],
+		"Reconfig": [
+			"*.txt",
 		]
 	},
 	"files.associations": {
@@ -64,6 +70,29 @@
 		"stop_token": "cpp",
 		"condition_variable": "cpp",
 		"future": "cpp",
-		"mutex": "cpp"
+		"mutex": "cpp",
+		"bitset": "cpp",
+		"format": "cpp",
+		"charconv": "cpp",
+		"expected": "cpp",
+		"span": "cpp",
+		"csignal": "cpp",
+		"any": "cpp",
+		"complex": "cpp",
+		"forward_list": "cpp",
+		"list": "cpp",
+		"map": "cpp",
+		"set": "cpp",
+		"unordered_set": "cpp",
+		"source_location": "cpp",
+		"iomanip": "cpp",
+		"stdfloat": "cpp",
+		"text_encoding": "cpp",
+		"valarray": "cpp",
+		"variant": "cpp",
+		"queue": "cpp",
+		"ranges": "cpp",
+		"cfenv": "cpp",
+
 	}
 }

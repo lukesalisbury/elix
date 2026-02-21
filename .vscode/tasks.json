@@ -4,14 +4,14 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Touch",
+			"label": "Reconfig",
 			"type": "shell",
 
 				"options": {
 					"cwd": "${workspaceFolder}/"
 				},
-				"command": "touch",
-				"args": ["src/elix_os_window.cpp", "src/elix_os.cpp"],
+				"command": "./gsb.exe",
+				"args": ["2>&1"],
 
 			"problemMatcher": ["$gcc"],
 			"group": "build"

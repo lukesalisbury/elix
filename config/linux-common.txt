@@ -6,13 +6,12 @@ wayland-client
 dbus-1
 SDL2
 [lib_flags]
--std=c++11
 
 [includes]
 src
 include
 [flags]
--std=c++11
+
 [defines]
 PLATFORM_LINUX
 [linker_flags]

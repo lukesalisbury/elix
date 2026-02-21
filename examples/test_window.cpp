@@ -1,16 +1,17 @@
-#include "elix_endian.hpp"
-#include "elix_html.hpp"
-#include "elix_fpscounter.hpp"
-#include "elix_os_window.hpp"
+#include "elix_endian.h"
+#include "elix_html.h"
 
-#include "elix_rgbabuffer.hpp"
+#include "extra/elix_fpscounter.hpp"
+#include "window/elix_os_window.hpp"
 
-#include "elix_cstring.hpp"
-#include "elix_program.hpp"
-#include "elix_os.hpp"
+#include "elix_rgbabuffer.h"
+#include "elix_cstring.h"
+#include "elix_os.h"
+#include "elix_graphics.h"
 
 static elix_fpscounter fps;
 static elix_program_info program_info;
+
 int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
 {
 	//elix_os_clipboard_put("asdf hello");

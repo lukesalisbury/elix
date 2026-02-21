@@ -1,12 +1,22 @@
+//#!gcc ./genscript.c -o ./gsb.exe
 /*************************************************************************
  * Generates build.ninja files for multiple platforms
- * build: gcc genscript.c -o genscript.exe
- * run: genscript.exe [-help]
+ * build: gcc genscript.c -o gsb.exe
+ *        clang genscript.c -o gsb.exe
+ * run: gsb.exe [-help]
  * 
  * 
  * Modules
  *  If first line is $static or $shared it will be build as such 
 *************************************************************************/
+//TODO: Fix Complier selection
+
+#define GENSCRIPT_VERSION 20250705
+
+#define SOURCE_DIRECTORY "src"
+//#define SOURCE_DIRECTORY "source"
+#define DEFAULT_BUILD_MODE "debug" //"release"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -14,21 +24,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 #ifndef SSIZE_MAX
-#ifdef _WIN64
-#define SSIZE_MAX INT64_MAX
-#else
-#define SSIZE_MAX INT32_MAX
-#endif
-#endif
-
-#ifndef SSIZE_MIN
-#ifdef _WIN64
-#define SSIZE_MIN INT64_MIN
-#else
-#define SSIZE_MIN INT32_MIN
-#endif
+	#ifdef _WIN64
+		#define SSIZE_MAX INT64_MAX
+		#define SSIZE_MIN INT64_MIN
+	#else
+		#define SSIZE_MAX INT32_MAX
+		#define SSIZE_MIN INT32_MIN
+	#endif
 #endif
 
 #define __USE_LARGEFILE64
@@ -37,7 +40,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
-
 
 #if __WIN32__
 #include <process.h>
@@ -49,10 +51,15 @@
 	#define nullptr NULL
 #endif
 
+
+/*** Elix ***/
+#define free_if(M) if (M != nullptr) { free(M); M = nullptr;}
+
 #define LOG_LINE printf("%s:%d \n", __FILE__, __LINE__)
 #define LOG_MESSAGE(M, ...) printf("%18s:%04d | " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 #define LOG_INFO(M, ...) printf( M "\n", ##__VA_ARGS__)
-//#define LOG_INFO(M, ...) printf( M " | [%04d]\n", ##__VA_ARGS__, __LINE__)
+#define PRINT(M, ...) printf( M , ##__VA_ARGS__)
+
 #define ARRAY_SIZE(Array) (sizeof(Array) / sizeof((Array)[0]))
 #define FH(q) q
 #define UNUSEDARG __attribute__((unused))
@@ -109,9 +116,7 @@ struct ElixFile {
 };
 typedef struct ElixFile elix_file;
 
-#define SOURCE_DIRECTORY "src"
-//#define SOURCE_DIRECTORY "source"
-
+// > String
 uint32_t elix_hash( const char * str, size_t len ) {
 	//Jenkins One-at-a-time hash
 	uint32_t hash = 0;
@@ -128,30 +133,6 @@ uint32_t elix_hash( const char * str, size_t len ) {
 	return hash;
 }
 
-bool elix_os_directory_make(const char * path, uint32_t mode, UNUSEDARG bool parent) {
-	#if __WIN32__
-		if ( ! mkdir(path) ) {
-			return true;
-		}
-
-		errno_t err;
-		_get_errno( &err );
-	#else
-		int32_t err = mkdir(path, S_IRWXU| S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-		if ( !err ) {
-			return true;
-		}
-	#endif
-
-	if ( err == EEXIST ) {
-		//LOG_MESSAGE("Directory was not created because dirname is the name of an existing file, directory, or device. %s", path);
-	} else if ( err == ENOENT ) {
-		//LOG_MESSAGE("Path was not found. %s", path);
-	}
-
-	return false;
-}
-
 size_t elix_cstring_length(const char * string, uint8_t include_terminator ) {
 	if (string) {
 		size_t c = 0;
@@ -162,102 +143,6 @@ size_t elix_cstring_length(const char * string, uint8_t include_terminator ) {
 	}
 	return 0;
 }
-
-file_offset elix_file_offset(elix_file * file) {
-	// Note: due to pointless warnings, using ftello64 instead of ftello
-	file_offset q = ftello64( FH(file->handle) );
-	if ( q < 0 ) {
-		return 0;
-	}
-	return q;
-}
-
-uint32_t elix_file_at_end(elix_file * file) {
-	if ( file->handle ) {
-		if ( file->pos >= file->length )
-			return true;
-		return !(feof( FH(file->handle) ) == 0);
-	}
-	return true;
-}
-
-uint32_t elix_file_seek(elix_file * file, file_offset pos ) {
-	if ( fseeko64( FH(file->handle), pos, SEEK_SET ) == 0) {
-		file->pos = pos;
-		return true;
-	}
-	return false;
-}
-
-size_t elix_file_read(elix_file * file, data_pointer buffer, size_t data_size, size_t amount) {
-	if ( !file || !file->handle || file->length < data_size || !buffer ) {
-		return 0;
-	}
-
-	size_t q = fread(buffer, data_size, amount, FH(file->handle));
-	if ( q != 0 ) {
-		file_offset p = elix_file_offset( file );
-		if ( p >= 0 ) {
-			file->pos = p;
-		}
-	}
-	return q;
-}
-
-file_size elix_file_tell(elix_file * file) {
-	return (file_size)(elix_file_offset(file));
-}
-
-file_size elix_file__update_length(elix_file * file) {
-	file_offset pos = elix_file_offset(file);
-	fseeko64( FH(file->handle), 0, SEEK_END );
-	file->length = elix_file_tell(file);
-	fseeko64( FH(file->handle), pos, SEEK_SET );
-	return file->length;
-}
-
-
-uint32_t elix_file_open(elix_file * file, const char * filename, ElixFileFlag mode) {
-	file->pos = 0;
-	file->length = 0;
-	file->handle = 0;
-	if ( mode & EFF_FILE_NEW ) {
-		struct stat buffer = {0};
-		if ( stat(filename, &buffer) == 0 ) {
-			file->flag = EFF_FILE_CREATE_ERROR;
-			return (uint32_t) EFF_FILE_CREATE_ERROR;
-		}
-	}
-
-	//
-	char cmode[4] = "rb";
-	if ( mode & EFF_FILE_CREATING ) {
-		cmode[0] = 'w';
-	} else if ( mode & EFF_FILE_WRITING ) {
-		cmode[0] = 'a';
-	}
-	file->handle = fopen(filename, cmode);
-
-	//fopen_s( &file->handle, filename, (mode & EFF_FILE_WRITE ? "wb" : "rb") );
-	if ( file->handle ) {
-		file->flag = mode;
-		elix_file__update_length(file);
-		return 0;
-	} else {
-		file->flag = EFF_FILE_ERROR;
-		//LOG_MESSAGE("File not found %s", filename);
-	}
-	return (uint32_t)(mode & EFF_FILE_WRITING ? EFF_FILE_WRITE_ERROR : EFF_FILE_READ_ERROR);
-
-}
-
-uint32_t elix_file_close(elix_file * file) {
-	if ( file->handle ) {
-		return fclose( FH(file->handle) ) == 0;
-	}
-	return false;
-}
-
 
 bool elix_cstring_has_suffix( const char * str, const char * suffix) {
 	size_t str_length = elix_cstring_length(str, 0);
@@ -339,15 +224,16 @@ char * elix_cstring_from( const char * source, const char * default_str, size_t 
 	return dest;
 }
 
+#define ELIX_IS_WHITESPACE(x) (x == ' ' || x == '\n' || x == '\r')
 size_t elix_cstring_trim( char * string ) {
 	size_t length = elix_cstring_length(string, 0);
 
-	while( length && string[0] == ' ' ) {
+	while( length && ELIX_IS_WHITESPACE(string[0])  ) {
 		memmove(string, string + 1, length);
 		length--;
 	}
 	size_t pos = length ? length-1 : 0;
-	while( pos && string[pos] == ' ' ) {
+	while( pos && ELIX_IS_WHITESPACE(string[pos]) ) {
 		string[pos] = 0;
 		length--;
 		pos--;
@@ -399,9 +285,29 @@ size_t elix_cstring_find_of(const char * str, const char * search, size_t offset
 	return SIZE_MAX;
 }
 
-size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const char *search, const char *replace) {
+size_t elix_cstring_find_last_of(const char * str, const char * search, size_t offset) {
+	size_t length = elix_cstring_length(str, 0);
+	size_t sl = elix_cstring_length(search, 0);
+	for (size_t c = length - sl; c > offset; c--) {
+		bool found = false;
+		for (size_t sc = 0; sc < sl; sc++) {
+			if ( str[c+sc] == search[sc]) {
+				found = (sc == sl-1);
+			} else {
+				break;
+			}
+		}
+		if ( found ) {
+			return c;
+		}
+	}
+	return SIZE_MAX;
+}
+
+size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const char *search, const char *replace, uint8_t repeat) {
 	//NOTE: This is slow, and not a good implemenation
 	//TODO: Check for overflow
+	//TODO: Implement Repeat
 	size_t search_len = 0, replace_len = 0;
 	ssize_t diff_len = 0;
 	size_t source_len = elix_cstring_length(source_text, 1);
@@ -439,6 +345,248 @@ size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const cha
 	}
 	return diff_len;
 }
+
+uint32_t elix_cstring_hash( const char * str ) {
+	return elix_hash(str, elix_cstring_length(str, 0));
+}
+
+uint8_t elix_cstring_match( const char * p1, const char * p2,size_t max_length) {
+	uint8_t * a = (uint8_t *)p1, * b = (uint8_t *)p2;
+	for (size_t i = 0; i < max_length; ++i) {
+		if ( a[i] != b[i] ) {
+			return 0;
+		}
+		if ( a[i] == 0 ) {
+			return 1;
+		}
+	}
+	return 1;
+}
+
+
+char * elix_cstring_merge( char ** source_array, char token) {
+	size_t str_size = 0;
+	size_t str_position = 0;
+	char * string = nullptr;
+	uint8_t c = 0;
+	uint8_t max = 0;
+
+	if (!source_array) {
+		return string;
+	}
+
+	while ( source_array[c]) {
+		str_size += elix_cstring_length(source_array[c], 0 );
+		c++;
+	}
+	max = c;
+
+	if ( str_size > 0x1FF ) {
+		return string;
+	}
+
+	str_size += c;
+	string = calloc(str_size, sizeof(char));
+	
+	for (uint8_t i = 0; i < max; i++) {
+		str_position = elix_cstring_append(string, str_size, source_array[i], elix_cstring_length(source_array[i], 1) );
+		if ( str_position < str_size ) {
+			string[str_position-1] = token;
+		}
+	}
+
+	return string;
+}
+
+char ** elix_cstring_split( const char * source, char token, char string_bracket) {
+	#define token_cache 8
+	size_t source_len = elix_cstring_length(source, 0);
+	size_t tokens = 0;
+	size_t position[token_cache] = {0};
+	size_t maxlength = 0, last_token = 0;
+	uint8_t outside_string = 1;
+	for (size_t i = 0; i < source_len; i++)	{
+		if ( source[i] == token ) {
+			if ( outside_string ) {
+				maxlength = (i - last_token) > maxlength ? (i - last_token) : maxlength;
+				last_token = i;
+				if (tokens < token_cache ) {
+					position[tokens] = last_token + 1;
+				}
+				tokens++;
+			}
+		} else if ( source[i] == string_bracket ) {
+			outside_string = !outside_string;
+		}
+	}
+	position[tokens] = source_len+1;
+	tokens++;
+
+	char ** output = malloc((tokens+1) * sizeof(char *));
+	if (tokens > token_cache ) {
+		//TODO
+	} else {
+		last_token = 0;
+		for (size_t i = 0; i < tokens; i++)	{
+			output[i] = elix_cstring_from(source + last_token, "", position[i] - last_token);
+			//LOG_INFO("%d > %d - '%s'", last_token, position[i], output[i]);
+			last_token = position[i];
+		}
+		output[tokens] = nullptr;
+	}
+	return output;
+	#undef token_cache
+}
+
+size_t elix_cstring_dequote( char * string ) {
+	size_t length = elix_cstring_length(string, 0);
+
+	while( length && string[0] == '"' ) {
+		memmove(string, string + 1, length);
+		length--;
+	}
+	size_t pos = length ? length-1 : 0;
+	while( pos && string[pos] == '"' ) {
+		string[pos] = 0;
+		length--;
+		pos--;
+	}
+	return length;
+}
+
+// < String
+
+// > File
+
+file_offset elix_file_offset(elix_file * file) {
+	// Note: due to pointless warnings, using ftello64 instead of ftello
+	file_offset q = ftello64( FH(file->handle) );
+	if ( q < 0 ) {
+		return 0;
+	}
+	return q;
+}
+
+uint32_t elix_file_at_end(elix_file * file) {
+	if ( file->handle ) {
+		if ( file->pos >= file->length )
+			return true;
+		return !(feof( FH(file->handle) ) == 0);
+	}
+	return true;
+}
+
+uint32_t elix_file_seek(elix_file * file, file_offset pos ) {
+	if ( fseeko64( FH(file->handle), pos, SEEK_SET ) == 0) {
+		file->pos = pos;
+		return true;
+	}
+	return false;
+}
+
+size_t elix_file_read(elix_file * file, data_pointer buffer, size_t data_size, size_t amount) {
+	if ( !file || !file->handle || file->length < data_size || !buffer ) {
+		return 0;
+	}
+
+	size_t q = fread(buffer, data_size, amount, FH(file->handle));
+	if ( q != 0 ) {
+		file_offset p = elix_file_offset( file );
+		if ( p >= 0 ) {
+			file->pos = p;
+		}
+	}
+	return q;
+}
+
+file_size elix_file_tell(elix_file * file) {
+	return (file_size)(elix_file_offset(file));
+}
+
+file_size elix_file__update_length(elix_file * file) {
+	file_offset pos = elix_file_offset(file);
+	fseeko64( FH(file->handle), 0, SEEK_END );
+	file->length = elix_file_tell(file);
+	fseeko64( FH(file->handle), pos, SEEK_SET );
+	return file->length;
+}
+
+uint32_t elix_file_open(elix_file * file, const char * filename, ElixFileFlag mode) {
+	file->pos = 0;
+	file->length = 0;
+	file->handle = 0;
+	if ( mode & EFF_FILE_NEW ) {
+		struct stat buffer = {0};
+		if ( stat(filename, &buffer) == 0 ) {
+			file->flag = EFF_FILE_CREATE_ERROR;
+			return (uint32_t) EFF_FILE_CREATE_ERROR;
+		}
+	}
+
+	//
+	char cmode[4] = "rb";
+	if ( mode & EFF_FILE_CREATING ) {
+		cmode[0] = 'w';
+	} else if ( mode & EFF_FILE_WRITING ) {
+		cmode[0] = 'a';
+	}
+	file->handle = fopen(filename, cmode);
+
+	//fopen_s( &file->handle, filename, (mode & EFF_FILE_WRITE ? "wb" : "rb") );
+	if ( file->handle ) {
+		file->flag = mode;
+		elix_file__update_length(file);
+		return 0;
+	} else {
+		file->flag = EFF_FILE_ERROR;
+		//LOG_MESSAGE("File not found %s", filename);
+	}
+	return (uint32_t)(EFF_FILE_ERROR | (mode & EFF_FILE_WRITING ? EFF_FILE_WRITE_ERROR : EFF_FILE_READ_ERROR));
+
+}
+
+uint32_t elix_file_close(elix_file * file) {
+	if ( file->handle ) {
+		return fclose( FH(file->handle) ) == 0;
+	}
+	return false;
+}
+
+size_t elix_file_read_line(elix_file * file, data_pointer data, size_t data_size) {
+	if ( !file || !file->handle || !data ) {
+		return 0;
+	}
+
+	uint8_t char_buffer;
+	uint8_t * data_buffer = data;
+	size_t index = 0;
+	size_t q;// = elix_file_read(file, &char_buffer, 1,1);
+
+	do {
+		q = elix_file_read(file, &char_buffer, 1,1);
+
+		if (char_buffer > 13 )
+			data_buffer[index++] = char_buffer;
+
+	} while ( char_buffer > 10  && index < data_size && !elix_file_at_end(file));
+	data_buffer[index] = 0;
+	return index;
+}
+
+size_t elix_file_write_string( elix_file * file, const char * string, size_t data_size) {
+	if ( !file || !file->handle ) {
+		return 0;
+	}
+	if ( data_size == 0 ) {
+		data_size = elix_cstring_length(string, 0);
+	}
+	return fwrite(string, data_size, 1, FH(file->handle));
+}
+
+
+// < File
+
+// > Path
 
 struct ElixPath {
 	char * uri;
@@ -522,7 +670,9 @@ elix_path elix_path_create(const char * string) {
 	return uri;
 }
 
-#define free_if(M) if (M != nullptr) { free(M); M = nullptr;}
+// < Path
+
+// > OS
 
 void elix_os_directory_list_destroy(elix_directory ** directory) {
 	for (int f = 0; f < (*directory)->count; ++f) {
@@ -543,7 +693,6 @@ elix_directory * elix_os_directory_list_files(const char * path, const char * su
 	struct dirent * entity = nullptr;
 	char buffer[ELIX_FILE_PATH_LENGTH] = {0};
 	size_t path_len = elix_cstring_length(path, 0);
-
 
 	current_directory = opendir(path);
 
@@ -600,41 +749,29 @@ elix_directory * elix_os_directory_list_files(const char * path, const char * su
 	return directory;
 }
 
-size_t elix_file_read_line(elix_file * file, data_pointer data, size_t data_size) {
-	if ( !file || !file->handle || !data ) {
-		return 0;
+bool elix_os_directory_make(const char * path, uint32_t mode, UNUSEDARG bool parent) {
+	#if __WIN32__
+		if ( ! mkdir(path) ) {
+			return true;
+		}
+
+		errno_t err;
+		_get_errno( &err );
+	#else
+		int32_t err = mkdir(path, S_IRWXU| S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+		if ( !err ) {
+			return true;
+		}
+	#endif
+
+	if ( err == EEXIST ) {
+		//LOG_MESSAGE("Directory was not created because dirname is the name of an existing file, directory, or device. %s", path);
+	} else if ( err == ENOENT ) {
+		//LOG_MESSAGE("Path was not found. %s", path);
 	}
 
-	uint8_t char_buffer;
-	uint8_t * data_buffer = data;
-	size_t index = 0;
-	size_t q;// = elix_file_read(file, &char_buffer, 1,1);
-
-	do {
-		q = elix_file_read(file, &char_buffer, 1,1);
-
-		if (char_buffer > 13 )
-			data_buffer[index++] = char_buffer;
-
-	} while ( char_buffer > 10  && index < data_size && !elix_file_at_end(file));
-	data_buffer[index] = 0;
-	return index;
+	return false;
 }
-
-size_t elix_file_write_string( elix_file * file, const char * string, size_t data_size) {
-	if ( !file || !file->handle ) {
-		return 0;
-	}
-	if ( data_size == 0 ) {
-		data_size = elix_cstring_length(string, 0);
-	}
-	return fwrite(string, data_size, 1, FH(file->handle));
-}
-
-uint32_t elix_cstring_hash( const char * str ) {
-	return elix_hash(str, elix_cstring_length(str, 0));
-}
-
 
 uint8_t elix_os_directory_is( const char * path){
 	#ifdef __WIN32__
@@ -665,6 +802,107 @@ uint8_t elix_os_directory_is( const char * path){
 	return false;
 }
 
+void elix_os_command_capture( char * program, char * buffer, size_t buffer_size, char ** env, ...) {
+	int err = 0;
+	size_t count = 0;
+	size_t str_size = 0;
+	size_t str_position = 0;
+
+	char * command_string = nullptr;
+
+	va_list passed_arguments, count_arguments;
+	va_start(passed_arguments, env);
+	va_copy(count_arguments, passed_arguments);
+	while ( true ) {
+		char * carg = va_arg(count_arguments, char*);
+		if (!carg) break;
+		str_size += elix_cstring_length(carg, 1);
+		count++;
+	}
+	va_end(count_arguments);
+
+	str_size += elix_cstring_length(program, 1) + count;
+
+	if ( str_size > 0x1FF ) {
+		LOG_INFO("Command lenght is to much: %s", program);
+		return;
+	}
+
+	command_string = calloc(str_size, sizeof(char));
+
+	str_position = elix_cstring_append(command_string, str_size, program, elix_cstring_length(program, 1) );
+
+	if ( count ) {
+		for ( size_t i = 1; i <= count; i++) {
+			if ( str_position < str_size ) {
+				command_string[str_position-1] = ' ';
+			}
+			char * current_arg = va_arg(passed_arguments, char*);
+			str_position = elix_cstring_append(command_string, str_size, current_arg, elix_cstring_length(current_arg, 1) );
+		}
+	}
+
+
+	FILE * command_pipe = popen(command_string, "r");
+	if ( !command_pipe ) {
+		LOG_INFO("Error running command: %s", program);
+	} else {
+		size_t q = fread(buffer, buffer_size, 1, command_pipe);
+		pclose(command_pipe);
+	}
+
+	va_end(passed_arguments);
+
+	free_if(command_string);
+
+}
+
+void elix_os_command( char * program, char ** env, ...) {
+//
+	int err = 0;
+	size_t count = 0;
+	size_t str_size = 0;
+	char ** arguments = nullptr;
+
+	va_list passed_arguments, count_arguments;
+	va_start(passed_arguments, env);
+	va_copy(count_arguments, passed_arguments);
+	while ( true ) {
+		char * carg = va_arg(count_arguments, char*);
+		if (!carg) break;
+		count++;
+	}
+	va_end(count_arguments);
+
+	if ( count ) {
+		arguments = calloc((count + 2) , sizeof(char *));
+		arguments[0] = program;
+		for ( size_t i = 1; i <= count; i++) {
+			arguments[i]  = va_arg(passed_arguments, char*);
+		}
+	}
+
+	#ifdef __WIN32__
+	err = _spawnvp( _P_WAIT, arguments[0], (const char *const *) arguments );
+	#else
+	id_t pid;
+	err = posix_spawnp(&pid, arguments[0], nullptr, nullptr, arguments, nullptr );
+	#endif
+	
+	if ( err != 0 ) {
+		LOG_INFO("Error running command: %s", program);
+	}
+
+	va_end(passed_arguments);
+
+	free_if(arguments);
+
+}
+
+// < OS
+
+/*** Genscript  ***/
+
 typedef struct {
 	uint32_t id;
 	char note[16];
@@ -677,8 +915,30 @@ typedef struct {
 	char content[256];
 } ExtensionOutput;
 
+typedef struct {
+	char name[16];
+	char flag[512];
+	char libflag[512];
+	char define[256];
+} CompilerConfigOption;
+
+#define PACK_ID(A, B, C, D) (A | B << 8 | C << 16 | D << 24 )
+#define UNPACK_ID(ID) { ID & 0xFF, (ID & 0xFF00) >> 8, (ID & 0xFF0000) >> 16, (ID & 0xFF000000) >> 24, 0 }
+
+typedef struct {
+	uint32_t id; // Use PACK_ID macro
+	char filename[64];
+	char content[1024];
+} EditorFile;
+
+/* Genscript Default Settings */
+
 static char config_arch_text[512] = "[defines]\n\
 PLATFORM_BITS=$bits\n\
+[options]\n\
+compiler=$tripletgcc\n\
+linker=$tripletgcc\n\
+static_linker=ar -rc\n\
 ";
 
 static char config_default_text[2048] = "[options]\n\
@@ -688,40 +948,87 @@ static_linker=ar -rc\n\
 program_suffix=\n\
 shared_suffix=.so\n\
 static_suffix=.a\n\
+cppStandard=c++14\n\
+cStandard=c11\n\
+[includes]\n\
+./include/\n\
 [options-windows]\n\
 program_suffix=.exe\n\
+shared_suffix=.dll\n\
 [options-3ds]\n\
 finaliser=3dsxtool\n\
 program_suffix=.elf\n\
 finalise_suffix=.3dsx\n\
 [commands]\n\
-compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_flags} -o $out -c $in\n\
-compile_c=${compiler} ${compiler_includes} ${compller_defines}  ${compiler_flags} -o $out -c $in\n\
-link_shared=${linker} -shared ${compiler_lib_flags} $in -o ${binary_prefix}$out\n\
-link_static=${static_linker} ${object_dir}$out $in \n\
+compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_cpp_flags} ${compiler_flags} -o $out -c $in\n\
+compile_c=${compiler} ${compiler_includes} ${compller_defines} ${compiler_c_flags} ${compiler_flags} -o $out -c $in\n\
+link_shared=${linker} -shared ${compiler_lib_flags} $in -o ${binary_prefix}$out  ${compiler_lib}\n\
+link_static=${static_linker} ${object_dir}/$out $in \n\
 link=${linker} ${compiler_lib_flags} $in -o ${binary_prefix}$out ${compiler_lib} \n\
 finalise=${finaliser} ${finalise_flags} $in -o ${binary_prefix}$out\n\
 build_resources=echo\n\
 clean=rm -rf ${object_dir}\n\
 ";
 
+static CompilerConfigOption compiler_debug_options[8] = {
+	{"gcc", "-ggdb3", "-ggdb3 ", "_DEBUG"},
+	{"gcc-full", "-ggdb3 -fsanitize=address,undefined -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -fasynchronous-unwind-tables", 
+	"-ggdb3 -fsanitize=address,undefined -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -fasynchronous-unwind-tables", "_DEBUG"},
+	{"clang", "-ggdb3", "-ggdb3 ", "_DEBUG"},
+};
+
 static ExtensionOutput ninja_extension_output[32] = {
 	{"link_stage", "", "build %s${binary_suffix}${program_suffix}: link %s\n"},
 	{"lk_shared_stage", "", "build %s${binary_suffix}${shared_suffix}: link_shared %s\n"},
-	{"lk_static_stage", "", "build %s${binary_suffix}${static_suffix}: link_static %s\n"},
+	{"lk_static_stage", "", "build %s${binary_suffix}${static_suffix}: link_static %s\nbuild ${object_dir}/%s${binary_suffix}${static_suffix}: phony %s${binary_suffix}${static_suffix}\n"},
 	{"resource_stage", "", "build ${object_dir}/resources: build_resources %s\n"},
 	{"final_stage", "", "build %s${binary_suffix}${finalise_suffix}: finalise %s${binary_suffix}${program_suffix}\n"},
 	{"cpp", "o", "build ${object_dir}%s.%s: compile_cpp %s.cpp\n"},
+	{"cc", "o", "build ${object_dir}%s.%s: compile_cpp %s.cc\n"}, // .cc is used for C-style C++ code
 	{"c", "o", "build ${object_dir}%s.%s: compile_c %s.c\n"},
 	{ "", "", ""}
 };
 
+static ExtensionOutput bash_extension_output[32] = {
+	{"link_stage", "", "\t${linker} ${compiler_lib_flags} -o ${binary_prefix}%s${binary_suffix}${program_suffix} %s ${compiler_lib}\n"},
+	{"lk_shared_stage", "", "\t${linker} -shared ${compiler_lib_flags}  -o ${binary_prefix}%s${binary_suffix}${shared_suffix} %s ${compiler_lib}\n"},
+	{"lk_static_stage", "", "${static_linker} ${object_dir}$out $in \n"},
+	{"resource_stage", "", "TODO\n"},
+	{"final_stage", "", "TODO\n"},
+	{"cpp", "o", "\t${compiler} ${compiler_includes} ${compller_defines} ${compiler_cpp_flags} ${compiler_flags} -o ${object_dir}%s.%s -c %s.cpp\n"},
+	{"cc", "o", "\t${compiler} ${compiler_includes} ${compller_defines} ${compiler_cpp_flags} ${compiler_flags} -o ${object_dir}%s.%s -c %s.cc\n"}, // .cc is used for C-style C++ code
+	{"c", "o", "\t${compiler} ${compiler_includes} ${compller_defines} ${compiler_c_flags} ${compiler_flags} -o ${object_dir}%s.%s -c %s.c\n"},
+	{ "", "", ""}
+};
+static ExtensionOutput batch_extension_output[32] = {
+	{"link_stage", "", "\t%%linker%% %%compiler_lib_flags%% -o %%binary_prefix%%%s%%binary_suffix%%%%program_suffix%% %s %%compiler_lib%%\n"},
+	{"lk_shared_stage", "", "\t%%linker%% -shared %%compiler_lib_flags%% -o %%binary_prefix%%%s%%binary_suffix%%%%shared_suffix%% %s %%compiler_lib%%\n"},
+	{"lk_static_stage", "", "TODO\n"},
+	{"resource_stage", "", "TODO\n"},
+	{"final_stage", "", "TODO\n"},
+	{"cpp", "o", "\t%%compiler%% %%compiler_includes%% %%compller_defines%% %%compiler_flags%% -o %%object_dir%%%s.%s -c %s.cpp\n"},
+	{"cc", "o", "\t%%compiler%% %%compiler_includes%% %%compller_defines%% %%compiler_flags%% -o %%object_dir%%%s.%s -c %s.cc\n"}, // .cc is used for C-style C++ code
+	{"c", "o", "\t%%compiler%% %%compiler_includes%% %%compller_defines%% %%compiler_flags%% -o %%object_dir%%%s.%s -c %s.c\n"},
+	{ "", "", ""}
+};
+
 static PlatformConfig config_platform_text[] = {
-	{ 0, "Default", "[libs]\nstdc++\nm\n[lib_flags]\n-std=c++11\n\n[includes]\n[flags]\n-std=c++11\n[defines]\nPLATFORM_$PLATFORM\n[linker_flags]\n-Wl,-rpath -Wl,\\$$ORIGIN/lib\n"},
+	{ 0, "Default", "[libs-cpp]\nstdc++\n[libs]\nm\n[lib_flags]\n[includes]\n[flags]\n[defines]\nPLATFORM_$PLATFORM\n[linker_flags]\n-Wl,-rpath -Wl,\\$$ORIGIN/lib\n"},
 	{ 0x6986d1e1, "3DS", "[libs]\nstdc++\nm\nctru\ncitro3d\n[lib_flags]\n-std=c++11\n-march=armv6k\n-mtune=mpcore\n-mfloat-abi=hard\n-mtp=soft\n-specs=3dsx.specs\n-L\"/opt/devkitpro/devkitARM/lib\"\n-L\"/opt/devkitpro/libctru/lib\"\n[includes]\n\"/opt/devkitpro/devkitARM/arm-none-eabi/include\"\n\"/opt/devkitpro/libctru/include\"\n[flags]\n-std=c++11\n-march=armv6k\n-mtune=mpcore\n-mfloat-abi=hard\n[defines]\nPLATFORM_3DS\nPLATFORM_BITS=32\nARM11\n[commands]\nfinalise=${finaliser} $in  $out ${finalise_flags}\nbuild_smdh=smdhtool --create -o $out\nbuild_pica=./genscript.exe -h=$out -i=$in.temp -c=\"picasso -o $in.temp $in\"\n[extension]\npica=h;build res/%s.h: build_pica %s.pica\n"}
 };
 
+/* */
+static EditorFile editor_files[] = {
+	{PACK_ID('V','S','C','o'), ".vscode/", ""},
+	{PACK_ID('V','S','C','o'), ".vscode/tasks.json", "{\n\t\"version\": \"2.0.0\",\n\t\"tasks\":[\n\t\t{\n\t\t\t\"type\": \"shell\",\n\t\t\t\"label\": \"Build All\",\n\t\t\t\"command\": \"ninja\",\n\t\t\t\"problemMatcher\": [\n\t\t\t\t\"$gcc\"\n\t\t\t],\n\t\t\t\"group\": {\n\t\t\t\t\"kind\": \"build\",\n\t\t\t\t\"isDefault\": true\n\t\t\t}\n\t\t},\n\t\t{\n\t\t\t\"type\": \"shell\",\n\t\t\t\"label\": \"Reconfig\",\n\t\t\t\"command\": \"./gsb.exe\",\n\t\t\t\"group\": {\n\t\t\t\t\"kind\": \"build\",\n\t\t\t\t\"isDefault\": false\n\t\t\t}\n\t\t}\n\t\t]\n\t\n}"},
+	{PACK_ID('V','S','C','o'), ".vscode/settings.json", "{\n\t\"triggerTaskOnSave.on\": true,\n\t\"triggerTaskOnSave.tasks\": {\n\t\t\"Build All\": [\n\t\t\t\"*.c\",\n\t\t\t\"*.cc\",\n\t\t\t\"*.h\",\n\t\t\t\"*.cpp\",\n\t\t\t\"*.hpp\",\n\t\t],\n\t\t\"Reconfig\": [\n\t\t\t\"*.txt\",\n\t\t],\n\t},\n}"},
+	{PACK_ID('V','S','C','o'), ".vscode/launch.json", "{\n\t\"version\": \"0.2.0\",\n\t\"configurations\": [\n\t\t{\n\t\t\t\"name\":\"Debug\",\n\t\t\t\"type\":\"cppdbg\",\n\t\t\t\"request\": \"launch\",\n\t\t\t\"cwd\": \"${workspaceRoot}\",\n\t\t\t\"program\": \"${workspaceRoot}/bin/bookish-debug-linux-x86_64\"\n\t\t}\n\t]\n}\n" },
 
+
+
+};
+
+/* genscript enum & struct */
 typedef struct {
 	char os[16];
 	char arch[8];
@@ -730,6 +1037,7 @@ typedef struct {
 	char bits[4];
 	char triplet[32];
 	uint32_t os_hash;
+	uint32_t build_system;
 } CompilerInfo;
 
 typedef enum {
@@ -737,7 +1045,7 @@ typedef enum {
 } scan_mode;
 
 typedef enum {
-	PM_HELP, PM_INFO, PM_NEWPROJECT, PM_NEWPLATFORM, PM_GEN, PM_UPDATEMODULE, PM_B2H, PM_AUTO
+	PM_HELP, PM_INFO, PM_NEWPROJECT, PM_NEWPLATFORM, PM_GEN, PM_UPDATEMODULE, PM_EDITORCONFIG, PM_B2H, PM_REBUILDSELF, PM_SWITCH, PM_INTERACTIVE, PM_AUTO
 } program_mode;
 
 typedef enum {
@@ -748,14 +1056,12 @@ typedef enum {
 	LT_PROGRAM, LT_SHARED, LT_STATIC, LT_SKIP
 } linking_type;
 
-
 typedef struct {
 	uint8_t current;
 	uint32_t hash[64];
 	char key[64][256];
 	char value[64][256];
 } ConfigMap;
-
 
 typedef struct {
 	uint8_t current;
@@ -779,6 +1085,7 @@ typedef struct {
 typedef struct {
 	char formatting[32];
 	ConfigList * option;
+	char * skip_formatting_prefix;
 	char * buffer;
 } JoinConfigList;
 
@@ -859,25 +1166,12 @@ void push_configmap(ConfigMap * map, const char * data, uint8_t overwrite) {
 	}
 }
 
-uint8_t elix_string_match( const char * p1, const char * p2,size_t max_length) {
-	uint8_t * a = (uint8_t *)p1, * b = (uint8_t *)p2;
-	for (size_t i = 0; i < max_length; ++i) {
-		if ( a[i] != b[i] ) {
-			return 0;
-		}
-		if ( a[i] == 0 ) {
-			return 1;
-		}
-	}
-	return 1;
-}
-
 void pushunique_configlist(ConfigList * list, const char * data) {
 	if ( list->current < 254 ) {
 		size_t length = elix_cstring_length(data, 0);
 		uint8_t lookup_count = 0;
 		while (lookup_count < list->current ) {
-			if ( elix_string_match(data, list->value[lookup_count], 256) )
+			if ( elix_cstring_match(data, list->value[lookup_count], 256) )
 				return;
 			lookup_count++;
 		}
@@ -893,6 +1187,17 @@ void push_configlist(ConfigList * list, const char * data) {
 		list->current++;
 	}
 }
+
+size_t is_in_configlist(ConfigList * list, const char * data) {
+	size_t founded = 0;
+	if (  list->current > 0 && list->current < 254 ) {
+		for (size_t i = 0; i < list->current; i++) {
+			founded += elix_cstring_has_prefix(list->value[i], data);
+		}
+	}
+	return founded;
+}
+
 
 void push_extensionoutput(ExtensionOutput * list, const char * stage, const char * oext, const char * content) {
 	uint8_t index = 5;
@@ -920,11 +1225,12 @@ void pushstring_extensionoutput(ExtensionOutput * list,  const char * data) {
 	if ( !index2 || index2 == SIZE_MAX || index2 > length) {
 		index2 = index;
 	}
+
 	char * stage = elix_cstring_from(data, "unknown", index+1);
 	char * oext = elix_cstring_from(data + index + 1, "*", index2 - index); 
 	char * content  = elix_cstring_from(data + index2 + 1, "ERROR", length - index2);
 
-	
+
 	while (  list_index < 32 ) {
 		if ( !list[list_index].stage[0] ) {
 			elix_cstring_copy(stage, list[list_index].stage);
@@ -1023,6 +1329,8 @@ CompilerInfo check_preprocessor() {
 	#if !defined(PLATFORM_COMPILER)
 		#if defined(__GNUC__)
 			#define PLATFORM_COMPILER "gcc"
+		#elif defined(__clang__)
+			#define PLATFORM_COMPILER "clang"
 		#elif defined(__llvm__)
 			#define PLATFORM_COMPILER "llvm"
 		#elif defined(_MSC_VER)
@@ -1036,9 +1344,9 @@ CompilerInfo check_preprocessor() {
 	elix_cstring_copy(PLATFORM, info.os);
 	elix_cstring_copy(PLATFORM_ARCH, info.arch);
 	elix_cstring_copy(PLATFORM_COMPILER, info.compiler);
-	elix_cstring_copy("release", info.mode);
+	elix_cstring_copy(DEFAULT_BUILD_MODE, info.mode);
 
-	snprintf(info.bits,3, "%d", PLATFORM_BITS);
+	snprintf(info.bits, 3, "%d", PLATFORM_BITS);
 
 	info.os_hash = elix_hash(info.os, elix_cstring_length(info.os, 0));
 
@@ -1058,17 +1366,18 @@ uint64_t extension_ident( const char * extension ) {
 }
 
 void update_string_from_compilerinfo( char * source_text, size_t source_size, CompilerInfo * target ) {
-	elix_cstring_inreplace(source_text, source_size, "$platform", target->os);
-	elix_cstring_inreplace(source_text, source_size, "$arch", target->arch);
-	elix_cstring_inreplace(source_text, source_size, "$compiler", target->compiler);
-	elix_cstring_inreplace(source_text, source_size, "$mode", target->mode);
-	elix_cstring_inreplace(source_text, source_size, "$bits", target->bits);
-	elix_cstring_inreplace(source_text, source_size, "$triplet", target->triplet);
+	elix_cstring_inreplace(source_text, source_size, "$platform", target->os, 1);
+	elix_cstring_inreplace(source_text, source_size, "$arch", target->arch, 1);
+	elix_cstring_inreplace(source_text, source_size, "$compiler", target->compiler, 1);
+	elix_cstring_inreplace(source_text, source_size, "$mode", target->mode, 1);
+	elix_cstring_inreplace(source_text, source_size, "$bits", target->bits, 1);
+	elix_cstring_inreplace(source_text, source_size, "$triplet", target->triplet, 1);
+	elix_cstring_inreplace(source_text, source_size, "$buildmode", target->mode, 1);
 
 	char os[16];
 	elix_cstring_copy(target->os, os);
 	elix_cstring_transform(os, ELIX_CHAR_UPPER);
-	elix_cstring_inreplace(source_text, source_size, "$PLATFORM", os);
+	elix_cstring_inreplace(source_text, source_size, "$PLATFORM", os, 1);
 }
 
 char *  elix_cstring_formatted( const char * format, ... ) {
@@ -1107,12 +1416,46 @@ size_t elix_file_write_string_from_compilerinfo( elix_file * file, const char * 
 	return fwrite(buffer, elix_cstring_length(buffer, 0), 1, FH(file->handle));
 }
 
+uint8_t scan_filelist( char * file_path, const char * module, ConfigList * files, ConfigList * module_list, ConfigList * link_objects) {
+
+	char * trim_path = file_path;
+	char * path_ext = nullptr;
+
+	size_t newl = elix_cstring_find_of(file_path, "/*.", 0);
+	size_t extl = elix_cstring_length(file_path, 0);
+	if ( newl < ELIX_FILE_PATH_LENGTH ) {
+		trim_path = malloc(newl);
+		elix_cstring_copy2(file_path, trim_path, newl);
+
+		if ( !elix_cstring_match(file_path+newl+1, "*.*", 4) ) {
+			path_ext = malloc(extl-newl);
+			elix_cstring_copy2(file_path+newl+2, path_ext, extl-newl-2);
+		}
+	}	
+	
+	elix_directory * directory = elix_os_directory_list_files(trim_path, path_ext);
+	if ( directory ) {
+		for (size_t b = 0; b < directory->count; ++b) {
+			if ( !elix_os_directory_is(directory->files[b].uri) ) {
+				elix_cstring_copy(directory->files[b].uri, files->value[files->current]);
+				files->current++;
+			}
+		}
+		elix_os_directory_list_destroy(&directory);
+	}
+
+	if ( trim_path != file_path ) {
+		free(trim_path);
+	}
+	free_if(path_ext);
+	return 0;
+}
 
 uint8_t parse_filelist( const char * module, ConfigList * files, ConfigList * module_list, ConfigList * link_objects) {
 	uint8_t link = LT_PROGRAM;
 	char filename[512] = "./config/modules/$module.txt";
 	uint8_t counter = 0;
-	elix_cstring_inreplace(filename, 512, "$module", module);
+	elix_cstring_inreplace(filename, 512, "$module", module,0);
 
 	elix_file file = {0};
 	elix_file_open(&file, filename, EFF_FILE_READ);
@@ -1126,21 +1469,33 @@ uint8_t parse_filelist( const char * module, ConfigList * files, ConfigList * mo
 			pushunique_configlist(module_list, data + 1);
 
 			elix_cstring_copy("", link_objects->value[link_objects->current]);
+			
+			elix_cstring_append(link_objects->value[link_objects->current], 255, "${object_dir}", 14);
 			elix_cstring_append(link_objects->value[link_objects->current], 255, data + 1, elix_cstring_length(data + 1, 0));
 			elix_cstring_append(link_objects->value[link_objects->current], 255, "${binary_suffix}${static_suffix} ", 34);
 			
 			//LOG_INFO("%d %s", link_objects->current, link_objects->value[link_objects->current]);
 			link_objects->current++;
-
+		} else if ( elix_cstring_has_prefix(data, "//") ) {
+			
 		} else if ( elix_cstring_has_prefix(data, "$shared") ) {
 			link = LT_SHARED;
 		} else if ( elix_cstring_has_prefix(data, "$static") ) {
 			link = LT_STATIC;
 		} else if ( elix_cstring_has_prefix(data, "./") ) {
-			elix_cstring_copy(data + 2, files->value[files->current]);
+			if ( elix_cstring_find_of(data, "/*.", 1) != SIZE_MAX) {
+				scan_filelist(data, module, files, module_list, link_objects);
+			} else {
+				elix_cstring_copy(data + 2, files->value[files->current]);
+			}
 			counter++;
 		} else if ( data[0] ) {
-			elix_cstring_copy(data, files->value[files->current]);
+			if ( elix_cstring_find_of(data, "/*.", 0) != SIZE_MAX ) {
+				scan_filelist(data, module, files, module_list, link_objects);
+			} else {
+				elix_cstring_copy(data, files->value[files->current]);
+			}
+			
 			counter++;
 		}
 		files->current++;
@@ -1154,12 +1509,59 @@ uint8_t parse_filelist( const char * module, ConfigList * files, ConfigList * mo
 }
 
 
-///TODO: 
 void parse_package_linux( char data[256], CurrentConfiguration * options, CompilerInfo * compiler) {
+	char arguments[][16] = {
+		"--cflags",
+		"--libs"
+	};
+
+	ConfigList * config_index[] = {
+		&options->flags,
+		&options->libs
+	};
+
+	char output[512] = {};
+	char package_name[16] = {};
+	elix_cstring_copy2(data, package_name, 15);
+
+	for ( uint8_t i = 0; i < 2;  i++) {
+		elix_os_command_capture( "pkg-config", output, 512, nullptr /*env*/, arguments[i], package_name, nullptr);
+		elix_cstring_trim(output);
+
+		char ** split_arguments = elix_cstring_split( output, ' ', 0);
+		if ( split_arguments ) {
+			size_t in = 0;
+			while (split_arguments[in]) {
+				LOG_INFO("Package %s, %s returned %s", package_name, arguments[i], split_arguments[in]);
+				push_configlist(config_index[i], split_arguments[in]);
+				in++;
+			}
+			free(split_arguments);
+		} else {
+			LOG_INFO("Package %s, %s returned %s", package_name, arguments[i], output);
+			push_configlist(config_index[i], output);
+		}
+
+		memset(output, 0, 512);
+	}
+}
+
+
+void parse_package( char data[256], CurrentConfiguration * options, CompilerInfo * compiler) {
+
+	switch (compiler->os_hash)
+	{
+		case 0xd03ded56: //Linux
+			parse_package_linux(data, options,compiler);
+		break;
+
+		default:
+		break;
+	}
 
 }
 
-void parse_txtcfg( const char * filename,  CurrentConfiguration * options, CompilerInfo * compiler) {
+uint32_t parse_txtcfg( const char * filename, CurrentConfiguration * options, CompilerInfo * compiler) {
 	LOG_INFO("\tReading %s", filename);
 	elix_file file = {0};
 	ConfigList * write_options = nullptr;
@@ -1171,7 +1573,8 @@ void parse_txtcfg( const char * filename,  CurrentConfiguration * options, Compi
 	snprintf(platform_option, 64, "[options-%s]", compiler->os);
 	snprintf(commands_option, 64, "[commands-%s]", compiler->os);
 	snprintf(package_option, 64, "[pkg-%s]", compiler->os);
-	elix_file_open(&file, filename, EFF_FILE_READ);
+	if ( elix_file_open(&file, filename, EFF_FILE_READ) != 0 )
+		return 0;
 	while (!elix_file_at_end(&file)) {
 		char data[256] = {0};
 		elix_file_read_line(&file, data, 256);
@@ -1255,14 +1658,16 @@ void parse_txtcfg( const char * filename,  CurrentConfiguration * options, Compi
 			} else if (write_mode == 3) {
 				pushstring_extensionoutput(ninja_extension_output, data);
 			} else if (write_mode == 16) {
-				
+				elix_cstring_transform(data, ELIX_CHAR_LOWER);
+				LOG_INFO("Package Lookup: %s", data);
+				parse_package(data, options, compiler);
 			} else {
 				//LOG_INFO("Config option skipped: %s", data);
 			}
 		}
 	}
 	elix_file_close(&file);
-
+	return 1;
 }
 
 size_t join_config_option( JoinConfigList * item) {
@@ -1274,8 +1679,13 @@ size_t join_config_option( JoinConfigList * item) {
 	
 	for (size_t i = 0; i < item->option->current; i++) {
 		char tempbuffer[128] = {0};
-		size_t q = snprintf(tempbuffer, 128, item->formatting, item->option->value[i]);
-		elix_cstring_append(item->buffer, 1024, tempbuffer, q);
+		if( item->skip_formatting_prefix && elix_cstring_has_prefix( item->option->value[i], item->skip_formatting_prefix) ) {
+			size_t q = snprintf(tempbuffer, 128, "%s ", item->option->value[i]);
+			elix_cstring_append(item->buffer, 1024, tempbuffer, q);
+		} else {
+			size_t q = snprintf(tempbuffer, 128, item->formatting, item->option->value[i]);
+			elix_cstring_append(item->buffer, 1024, tempbuffer, q);
+		}
 	}
 
 	return elix_cstring_length(item->buffer, 0);
@@ -1285,17 +1695,19 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 	LOG_INFO("Building: %s", filename);
 	
 	JoinConfigList ini_list[] = {
-		{ "-D%s ", &options->defines, nullptr},
-		{ "%s ", &options->flags, nullptr},
-		{ "-l%s ", &options->libs, nullptr},
-		{ "%s ", &options->lib_flags, nullptr},
-		{ "%s ", &options->final_flags, nullptr},
-		{ "-I%s ", &options->includes, nullptr},
+		{ "-D%s ", &options->defines, "-D", nullptr},
+		{ "%s ", &options->flags, nullptr, nullptr},
+		{ "-l%s ", &options->libs, "-l", nullptr},
+		{ "%s ", &options->lib_flags, nullptr, nullptr},
+		{ "%s ", &options->final_flags, nullptr, nullptr},
+		{ "-I%s ", &options->includes, "-I", nullptr},
 	};
 	char platform_file[128] = "./config/$platform-common.txt";
 	char arch_file[128] = "./config/$platform-$arch.txt";
+	char compiler_common_file[128] = "./config/$platform-$arch-$compiler-$buildmode.txt";
 	char compiler_file[128] = "./config/$platform-$arch-$compiler.txt";
-	char compiler_common_file[128] = "./config/$compiler-common.txt";
+
+	char * program_name = get_configmap(&options->options, "name");
 
 	update_string_from_compilerinfo(platform_file, 128, target);
 	update_string_from_compilerinfo(arch_file, 128, target);
@@ -1310,14 +1722,20 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 	parse_txtcfg(compiler_common_file, options, target);
 	parse_txtcfg(compiler_file, options, target);
 
-	if ( find_configmap(&options->options, "DEBUG") != SIZE_MAX || find_configmap(&options->options, "debug") != SIZE_MAX) {
-		push_configlist(&options->flags, "-g3");
-		push_configlist(&options->lib_flags, "-g3");
-	}
-
 	for (size_t i = 0; i < ARRAY_SIZE(ini_list); i++) {
 		join_config_option(&ini_list[i]);
 	}
+
+	///NOTE: Workaround for -static-libstdc++ arg in libs
+	if ( is_in_configlist(&options->lib_flags, "-static-libstdc++"))
+	{
+		char * buffer = get_configmap(&options->options, "linker");
+		if ( elix_cstring_has_suffix(buffer, "gcc") || elix_cstring_has_suffix(buffer, "gcc.exe")) {
+			LOG_INFO("\tUsing -static-libstdc++ requires using g++ instead of gcc as linker.");
+			elix_cstring_inreplace(buffer, 128, "gcc", "g++", 1);
+		}
+	}
+
 
 	//Write
 	elix_file file;
@@ -1332,6 +1750,21 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 	elix_file_write_formatted(&file, "compiler_includes = %s\n", ini_list[JCO_INCLUDE].buffer);
 	elix_file_write_formatted(&file, "compller_defines = %s\n", ini_list[JCO_DEFINES].buffer);
 	elix_file_write_string_from_compilerinfo(&file, "compiler_mode = $mode\n", target);
+
+	if ( find_configmap(&options->options, "cppStandard") != SIZE_MAX ) {
+		elix_file_write_formatted(&file, "compiler_cpp_flags = -std=%s\n", get_configmap(&options->options, "cppStandard"));
+	}
+	if ( find_configmap(&options->options, "cStandard") != SIZE_MAX ) {
+		elix_file_write_formatted(&file, "compiler_c_flags = -std=%s\n", get_configmap(&options->options, "cStandard"));
+	}
+
+	if ( find_configmap(&options->options, "program_executable") != SIZE_MAX ) {
+		elix_file_write_formatted(&file, "program_executable = %s\n", get_configmap(&options->options, "program_executable"));
+	} else {
+		elix_file_write_formatted(&file, "program_executable = %s\n", program_name);
+	}
+
+	
 
 	elix_file_write_formatted(&file, "finaliser_flags = %s\n", ini_list[JCO_FINAL_FLAGS].buffer);
 
@@ -1351,7 +1784,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 		}
 	}
 	
-	elix_file_write_string_from_compilerinfo(&file, "object_dir = compile/$platform-$arch/$mode\n", target);
+	elix_file_write_string_from_compilerinfo(&file, "object_dir = compile/$platform-$arch/$mode/\n", target);
 	elix_file_write_string(&file, "\n", 1);
 	//elix_file_write_string(&file,  default_ninja_rules, 0);
 
@@ -1361,12 +1794,27 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 		elix_file_write_formatted(&file, "  description = [%s] $in\n\n", options->commands.key[i]);
 	}
 
+	elix_file_write_formatted(&file, "rule %s\n", "build_genscript");
+	elix_file_write_formatted(&file, "  command = %s\n", "gcc genscript.c -o gsb.exe");
+	elix_file_write_formatted(&file, "  description = [%s] $in\n\n", "Build Script Generator");
+
+	elix_file_write_formatted(&file, "rule %s\n", "run_genscript");
+	elix_file_write_formatted(&file, "  command = %s\n", "./gsb.exe");
+	elix_file_write_formatted(&file, "  description = [%s] $in\n\n", "Run Build Script Generator");
+
+	elix_file_write_formatted(&file, "rule %s\n", "run_program");
+	elix_file_write_formatted(&file, "  command = %s\n", "${binary_prefix}${program_executable}${binary_suffix}${program_suffix}");
+	elix_file_write_formatted(&file, "  description = [%s] $in\n\n", "Run");
+
+
 	elix_file_write_string(&file, "\n", 1);
+	elix_file_write_string(&file, "build genscript: build_genscript\n", 0);
 	elix_file_write_string(&file, "build clean: clean\n", 0);
+	elix_file_write_string(&file, "build run: run_program\n", 0);
 	elix_file_write_string(&file, "\n", 1);
 	elix_file_write_string(&file, "#Files\n", 0);
 
-	char * program_name = get_configmap(&options->options, "name");
+	
 
 	char objects[6144] = {0};
 	char resources[6144] = {0};
@@ -1402,14 +1850,15 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 		elix_cstring_append(defaults, 255, "${object_dir}/resources ", 24);
 	}
 
-
 	//parse_filelist("base", &options->files, &options->modules);
-	for (size_t j = 0; j < options->modules.current; j++){
+	for (size_t j = 0; j < options->modules.current; j++) {
+		size_t i = options->files.current;
 		ConfigList link_objects = {0};
 		uint8_t linking_method = parse_filelist(options->modules.value[j], &options->files, &options->modules, &link_objects);
 	
 		char * current_name = j == 0 ? program_name : options->modules.value[j];
-		for (size_t i = 0; i < options->files.current; i++){
+		elix_file_write_formatted(&file, "#Module: %s [%x]\n", options->modules.value[j], linking_method);
+		for (; i < options->files.current; i++){
 			for (size_t var = 5; var < ARRAY_SIZE(ninja_extension_output); var ++) {
 				if ( !ninja_extension_output[var].stage[0] ) {
 					break;
@@ -1423,6 +1872,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 							break;
 						}
 					}
+					
 					char * no_src_dir = options->files.value[i];
 					size_t ifrst_dir_index = elix_cstring_find_of(options->files.value[i], "/", 0);
 					if ( ifrst_dir_index < 64 ) {
@@ -1433,6 +1883,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 					char format_buffer[128] = {0};
 					
 					size_t q = snprintf(format_buffer, 128, "${object_dir}%s.%s ", no_src_dir, ninja_extension_output[var].oext);
+					
 					elix_cstring_append(objects, 6144, format_buffer, q);
 
 					break;
@@ -1440,11 +1891,10 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 			}
 		}
 		elix_file_write_string(&file, "\n", 1);
-		switch (linking_method)
-		{
+		switch ( linking_method ) {
 			case LT_STATIC:
 				LOG_INFO("\tStatic Lib: %s", current_name);
-				elix_file_write_formatted(&file, ninja_extension_output[2].content, current_name, objects);
+				elix_file_write_formatted(&file, ninja_extension_output[2].content, current_name, objects,current_name,current_name);
 		
 				elix_cstring_append(defaults, 255, current_name, elix_cstring_length(current_name, 0));
 				elix_cstring_append(defaults, 255, "${binary_suffix}${static_suffix} ", 34);
@@ -1480,11 +1930,13 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 	elix_file_write_string(&file, "\n", 1);
 	
 	if ( find_configmap(&options->options, "finaliser") != SIZE_MAX ) {
+		elix_file_write_formatted(&file, "#Finaliser Step\n");
 		elix_file_write_formatted(&file, ninja_extension_output[2].content, program_name, program_name);
 	} else {
 
 	}
 
+	elix_file_write_formatted(&file, "####################################\n");
 	elix_file_write_formatted(&file, "default %s\n", defaults);
 	elix_file_close(&file);
 
@@ -1496,6 +1948,531 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 	elix_file_open(&default_file, "build.ninja", EFF_FILE_TRUNCATE);
 	elix_file_write_formatted(&default_file, "include %s\n\n", filename);
 	elix_file_close(&default_file);
+
+	return 0;
+}
+
+uint32_t fg_build_shellscript(CompilerInfo * target, CurrentConfiguration * options, char * filename ){
+	LOG_INFO("Building: %s", filename);
+	
+	JoinConfigList ini_list[] = {
+		{ "-D%s ", &options->defines, "-D", nullptr},
+		{ "%s ", &options->flags, nullptr, nullptr},
+		{ "-l%s ", &options->libs, "-l", nullptr},
+		{ "%s ", &options->lib_flags, nullptr, nullptr},
+		{ "%s ", &options->final_flags, nullptr, nullptr},
+		{ "-I%s ", &options->includes, "-I", nullptr},
+	};
+	char platform_file[128] = "./config/$platform-common.txt";
+	char arch_file[128] = "./config/$platform-$arch.txt";
+	char compiler_file[128] = "./config/$platform-$arch-$compiler.txt";
+	char compiler_common_file[128] = "./config/$compiler-$buildmode.txt";
+
+
+	update_string_from_compilerinfo(platform_file, 128, target);
+	update_string_from_compilerinfo(arch_file, 128, target);
+	update_string_from_compilerinfo(compiler_file, 128, target);
+	update_string_from_compilerinfo(compiler_common_file, 128, target);
+
+
+
+	//Read Default
+	parse_txtcfg("./config/default.txt", options, target);
+	parse_txtcfg("./config/project.txt", options, target);
+	parse_txtcfg(platform_file, options, target);
+	parse_txtcfg(arch_file, options, target);
+	parse_txtcfg(compiler_common_file, options, target);
+	parse_txtcfg(compiler_file, options, target);
+/*
+	if ( find_configmap(&options->options, "DEBUG") != SIZE_MAX || find_configmap(&options->options, "debug") != SIZE_MAX) {
+		push_configlist(&options->flags, "-g3");
+		push_configlist(&options->lib_flags, "-g3");
+		push_configlist(&options->defines, "_DEBUG");
+	}
+*/
+
+	for (size_t i = 0; i < ARRAY_SIZE(ini_list); i++) {
+		join_config_option(&ini_list[i]);
+	}
+
+	///NOTE: Workaround for -static-libstdc++ arg in libs
+	if ( is_in_configlist(&options->lib_flags, "-static-libstdc++"))
+	{
+		char * buffer = get_configmap(&options->options, "linker");
+		LOG_INFO("\tUsing -static-libstdc++ requires using g++ instead of gcc as linker.");
+		elix_cstring_inreplace(buffer, 128, "gcc", "g++",0);
+	}
+
+
+	//Write
+	elix_file file;
+	elix_file_open(&file, filename, EFF_FILE_TRUNCATE);
+
+	elix_file_write_string(&file, "#!/bin/bash\n", 0);	
+
+	elix_file_write_string(&file, "set -e\n", 0);
+
+	elix_file_write_string(&file, "#Variables\n", 0);
+
+	elix_file_write_formatted(&file, "compiler_lib=\"%s\"\n", ini_list[JCO_LIBS].buffer);
+	elix_file_write_formatted(&file, "compiler_lib_flags=\"%s\"\n", ini_list[JCO_LIBS_FLAGS].buffer);
+	elix_file_write_formatted(&file, "compiler_flags=\"%s\"\n", ini_list[JCO_FLAGS].buffer);
+	elix_file_write_formatted(&file, "compiler_includes=\"%s\"\n", ini_list[JCO_INCLUDE].buffer);
+	elix_file_write_formatted(&file, "compller_defines=\"%s\"\n", ini_list[JCO_DEFINES].buffer);
+	elix_file_write_string_from_compilerinfo(&file, "compiler_mode=\"$mode\"\n", target);
+
+	elix_file_write_formatted(&file, "finaliser_flags=\"%s\"\n", ini_list[JCO_FINAL_FLAGS].buffer);
+
+	elix_file_write_string(&file, "binary_prefix=\"bin/\"\n", 0);
+	elix_file_write_string_from_compilerinfo(&file, "binary_suffix=\"-$mode-$platform-$arch\"\n", target);
+
+	char * required_options[] = {
+		"finaliser", "compiler", "linker", "static_linker",
+		"program_suffix", "finalise_suffix",
+		"shared_suffix", "static_suffix"
+	};
+
+	for (size_t var = 0; var < ARRAY_SIZE(required_options); var++) {
+		char * buffer = get_configmap(&options->options, required_options[var]);
+		if ( buffer ) {
+			elix_file_write_formatted(&file, "%s=\"%s\"\n", required_options[var], buffer);
+		}
+	}
+	
+	elix_file_write_string_from_compilerinfo(&file, "object_dir=\"compile/$platform-$arch/$mode/\"\n", target);
+	elix_file_write_string(&file, "\n", 1);
+	elix_file_write_string(&file, "function clean_command {\n", 0);
+	elix_file_write_string(&file, "\techo \"TODO - Clean command is not complete\"\n", 0);
+	elix_file_write_string(&file, "}\n", 2);
+
+	elix_file_write_string(&file, "function run_command {\n", 0);
+	elix_file_write_string(&file, "\techo \"TODO - Run command is not complete\"\n", 0);
+	elix_file_write_string(&file, "}\n", 2);
+
+	elix_file_write_string(&file, "\n#Files\n", 0);
+
+	char * program_name = get_configmap(&options->options, "name");
+
+	char objects[6144] = {0};
+	char resources[6144] = {0};
+	char defaults[1024] = {0};
+
+	///TODO: finished resource handling in batch file
+	/*
+	if ( options->resources.current ) {
+		for (size_t i = 0; i < options->resources.current; i++){
+			for (size_t var = 5; var < ARRAY_SIZE(ninja_extension_output); var ++) {
+					if ( elix_cstring_has_suffix(options->resources.value[i], ninja_extension_output[var].stage) ) {
+						size_t leng = elix_cstring_length(options->resources.value[i], 0);
+						size_t basename_leng = leng;
+						char * basename = nullptr;
+						for (size_t split = 0; split < leng; split++) {
+							if ( options->resources.value[i][split] == '.') {
+								basename_leng = split +1;
+								break;
+							}
+						}
+						basename = elix_cstring_from(options->resources.value[i], "NUL", basename_leng);
+						elix_file_write_formatted(&file, ninja_extension_output[var].content, basename, options->resources.value[i]);
+						elix_file_write_formatted(&file, "\n");
+
+						char format_buffer[128] = {0};
+						size_t q = snprintf(format_buffer, 128, "%s%s", basename, ninja_extension_output[var].oext);
+						elix_cstring_append(resources, 6144, format_buffer, q);
+						free(basename);
+						break;
+					}
+			}
+
+		}
+		elix_file_write_formatted(&file, ninja_extension_output[3].content, resources);
+		elix_cstring_append(defaults, 255, "${object_dir}/resources ", 24);
+	}
+	*/
+
+	for (size_t j = 0; j < options->modules.current; j++){
+		size_t i = options->files.current;
+		ConfigList link_objects = {0};
+		uint8_t linking_method = parse_filelist(options->modules.value[j], &options->files, &options->modules, &link_objects);
+
+		char objects_buffer[6144] = {0};
+		char * current_name = j == 0 ? program_name : options->modules.value[j];
+		char last_directory[255] = {0};
+
+		for (; i < options->files.current; i++){
+			for (size_t var = 5; var < ARRAY_SIZE(bash_extension_output); var ++) {
+				if ( !bash_extension_output[var].stage[0] ) {
+					break;
+				}
+				if ( elix_cstring_has_suffix(options->files.value[i], bash_extension_output[var].stage) ) {
+					size_t leng = elix_cstring_length(options->files.value[i], 0);
+					for (size_t split = leng; split > 0; split--) {
+						if ( options->files.value[i][split] == '.') {
+							options->files.value[i][split] = 0;
+							leng = split;
+							break;
+						}
+					}
+					
+					char * no_src_dir = options->files.value[i];
+					size_t ifrst_dir_index = elix_cstring_find_of(options->files.value[i], "/", 0);
+					if ( ifrst_dir_index < 64 ) {
+						no_src_dir  = options->files.value[i] + ifrst_dir_index;
+					}
+
+					size_t q = 0;
+					char format_buffer[1024] = {0};
+					
+					size_t p = elix_cstring_find_last_of(no_src_dir, "/", 1 );
+					if ( p != SIZE_MAX ) {
+						no_src_dir[p] = 0; // NOTE: Stupid piece of code
+						if ( !elix_cstring_match( last_directory, no_src_dir, 255) ) {
+							q = snprintf(format_buffer, 1024, "\tmkdir -p ${object_dir}%s\n", no_src_dir);
+							elix_cstring_append(objects_buffer, 6144, format_buffer, q);
+							elix_cstring_copy(no_src_dir, last_directory);
+						}
+						no_src_dir[p] = '/'; // NOTE: Stupid piece of code
+					}
+
+					q = snprintf(format_buffer, 1024, bash_extension_output[var].content, no_src_dir, bash_extension_output[var].oext, options->files.value[i]);
+					elix_cstring_append(objects_buffer, 6144, format_buffer, q);
+					
+					q = snprintf(format_buffer, 1024, "${object_dir}%s.%s ", no_src_dir, bash_extension_output[var].oext);
+					elix_cstring_append(objects, 6144, format_buffer, q);
+
+					break;
+				}
+			}
+		}
+
+		switch (linking_method)
+		{
+			case LT_STATIC:
+				LOG_INFO("\tStatic Lib: %s", current_name);
+				elix_file_write_formatted(&file, "function compile_%s {\n", current_name);
+				elix_file_write_formatted(&file, "\techo 'compiling %s'\n", current_name);
+				elix_file_write_string(&file, "\tmkdir -p ${object_dir}\n", 24);
+
+				elix_file_write_string(&file, objects_buffer, 0);
+				elix_file_write_formatted(&file, bash_extension_output[2].content, current_name, objects);
+				elix_file_write_string(&file, "}\n", 0);
+
+				elix_cstring_append(defaults, 1024, "\tcompile_", 10);
+				elix_cstring_append(defaults, 1024, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1024, "\n", 1);
+				break;
+			case LT_SHARED:
+				LOG_INFO("\tShared Lib: %s", current_name);
+				elix_file_write_formatted(&file, "function compile_%s {\n", current_name);
+				elix_file_write_formatted(&file, "\techo 'compiling %s'\n", current_name);
+				elix_file_write_string(&file, "\tmkdir -p ${object_dir}\n", 24);
+				elix_file_write_string(&file, objects_buffer, 0);
+				elix_file_write_formatted(&file, bash_extension_output[1].content, current_name, objects);
+				elix_file_write_string(&file, "}\n", 0);
+
+				elix_cstring_append(defaults, 1024, "\tcompile_", 10);
+				elix_cstring_append(defaults, 1024, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1024, "\n", 1);
+
+				break;
+			case LT_SKIP:
+				LOG_INFO("\tModule Skipped: %s", current_name);
+				break;
+			default:
+				LOG_INFO("\tProgram:sd %s", current_name);
+
+				elix_file_write_formatted(&file, "function compile_%s {\n", current_name);
+				elix_file_write_formatted(&file, "\techo 'compiling %s'\n", current_name);
+				elix_file_write_string(&file, "\tmkdir -p ${object_dir}\n", 24);
+				elix_file_write_string(&file, objects_buffer, 0);
+				elix_file_write_formatted(&file, bash_extension_output[0].content, current_name, objects);
+				elix_file_write_string(&file, "}\n", 0);
+
+				elix_cstring_append(defaults, 1024, "\tcompile_", 10);
+				elix_cstring_append(defaults, 1024, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1024, "\n", 1);
+
+				break;
+		}
+		elix_file_write_string(&file, "\n", 1);
+		objects[0] = 0;
+	}
+
+	elix_file_write_string(&file, "\n", 1);
+	///TODO: Finished this as well
+	/*
+	if ( find_configmap(&options->options, "finaliser") != SIZE_MAX ) {
+		elix_file_write_formatted(&file, bash_extension_output[2].content, program_name, program_name);
+	} else {
+
+	}
+	*/
+
+	for (size_t j = 0; j < options->modules.current; j++){
+		char * current_name = j == 0 ? program_name : options->modules.value[j];
+		if ( 0 == j ) {
+			elix_file_write_formatted(&file,"if [[ \"$1\" == \"%s\" ]]; then\n", current_name);
+			elix_file_write_formatted(&file,"\tcompile_%s\n", current_name);
+		} else {
+			elix_file_write_formatted(&file,"elif [[ \"$1\" == \"%s\" ]]; then\n", current_name);
+			elix_file_write_formatted(&file,"\tcompile_%s\n", current_name);
+		}
+	}
+	elix_file_write_formatted(&file,"else\n");
+	elix_file_write_formatted(&file,"%s", defaults);
+	elix_file_write_formatted(&file,"fi\n");
+
+	for (size_t i = 0; i < ARRAY_SIZE(ini_list); i++){
+		free(ini_list[i].buffer);
+	}
+
+	return 0;
+}
+
+uint32_t fg_build_batch(CompilerInfo * target, CurrentConfiguration * options, char * filename ){
+	LOG_INFO("Building: %s", filename);
+	
+	JoinConfigList ini_list[] = {
+		{ "-D%s ", &options->defines, "-D", nullptr},
+		{ "%s ", &options->flags, nullptr, nullptr},
+		{ "-l%s ", &options->libs, "-l", nullptr},
+		{ "%s ", &options->lib_flags, nullptr, nullptr},
+		{ "%s ", &options->final_flags, nullptr, nullptr},
+		{ "-I%s ", &options->includes, "-I", nullptr},
+	};
+	char platform_file[128] = "./config/$platform-common.txt";
+	char arch_file[128] = "./config/$platform-$arch.txt";
+	char compiler_common_file[128] = "./config/$compiler-$buildmode.txt";
+	char compiler_file[128] = "./config/$platform-$arch-$compiler.txt";
+
+
+	update_string_from_compilerinfo(platform_file, 128, target);
+	update_string_from_compilerinfo(arch_file, 128, target);
+	update_string_from_compilerinfo(compiler_file, 128, target);
+	update_string_from_compilerinfo(compiler_common_file, 128, target);
+
+	//Read Default
+	parse_txtcfg("./config/default.txt", options, target);
+	parse_txtcfg("./config/project.txt", options, target);
+	parse_txtcfg(platform_file, options, target);
+	parse_txtcfg(arch_file, options, target);
+	parse_txtcfg(compiler_common_file, options, target);
+	parse_txtcfg(compiler_file, options, target);
+
+	if ( find_configmap(&options->options, "DEBUG") != SIZE_MAX || find_configmap(&options->options, "debug") != SIZE_MAX) {
+		push_configlist(&options->flags, compiler_debug_options[0].flag);
+		push_configlist(&options->lib_flags, compiler_debug_options[0].libflag);
+		push_configlist(&options->defines, compiler_debug_options[0].define);
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(ini_list); i++) {
+		join_config_option(&ini_list[i]);
+	}
+
+	///NOTE: Workaround for -static-libstdc++ arg in libs
+	if ( is_in_configlist(&options->lib_flags, "-static-libstdc++") ) {
+		char * buffer = get_configmap(&options->options, "linker");
+		LOG_INFO("\tUsing -static-libstdc++ requires using g++ instead of gcc as linker.");
+		elix_cstring_inreplace(buffer, 128, "gcc", "g++", 0);
+	}
+
+	//Write
+	elix_file file;
+	elix_file_open(&file, filename, EFF_FILE_TRUNCATE);
+
+	elix_file_write_string(&file, "@echo off\n", 0);
+
+	elix_file_write_string(&file, "rem Variables\n", 0);
+
+	elix_file_write_formatted(&file, "set compiler_lib=%s\n", ini_list[JCO_LIBS].buffer);
+	elix_file_write_formatted(&file, "set compiler_lib_flags=%s\n", ini_list[JCO_LIBS_FLAGS].buffer);
+	elix_file_write_formatted(&file, "set compiler_flags=%s\n", ini_list[JCO_FLAGS].buffer);
+	elix_file_write_formatted(&file, "set compiler_includes=%s\n", ini_list[JCO_INCLUDE].buffer);
+	elix_file_write_formatted(&file, "set compller_defines=%s\n", ini_list[JCO_DEFINES].buffer);
+	elix_file_write_string_from_compilerinfo(&file, "set compiler_mode=$mode\n", target);
+
+	elix_file_write_formatted(&file, "set finaliser_flags=%s\n", ini_list[JCO_FINAL_FLAGS].buffer);
+
+	elix_file_write_string(&file, "set binary_prefix=bin/\n", 0);
+	elix_file_write_string_from_compilerinfo(&file, "set binary_suffix=-$mode-$platform-$arch\n", target);
+
+	char * required_options[] = {
+		"finaliser", "compiler", "linker", "static_linker",
+		"program_suffix", "finalise_suffix",
+		"shared_suffix", "static_suffix"
+	};
+
+	for (size_t var = 0; var < ARRAY_SIZE(required_options); var++) {
+		char * buffer = get_configmap(&options->options, required_options[var]);
+		if ( buffer ) {
+			elix_file_write_formatted(&file, "set %s=%s\n", required_options[var], buffer);
+		}
+	}
+	
+	elix_file_write_string_from_compilerinfo(&file, "set object_dir=\"compile/$platform-$arch/$mode/\"\n", target);
+	elix_file_write_string(&file, "\n", 1);
+
+	elix_file_write_string(&file, "goto Commands\n\n", 0);
+
+
+	elix_file_write_string(&file, ":run\n", 0);
+	elix_file_write_string(&file, "\techo \"TODO\"\n", 0);
+
+
+	elix_file_write_string(&file, ":clean_command\n", 0);
+	elix_file_write_string(&file, "\techo \"TODO\"\n", 0);
+
+
+	char * program_name = get_configmap(&options->options, "name");
+
+	char objects[6144] = {0};
+	char resources[6144] = {0};
+	char defaults[1024] = {0};
+
+	///TODO: finished resource handling in batch file
+	/*
+	if ( options->resources.current ) {
+		for (size_t i = 0; i < options->resources.current; i++){
+			for (size_t var = 5; var < ARRAY_SIZE(ninja_extension_output); var ++) {
+					if ( elix_cstring_has_suffix(options->resources.value[i], ninja_extension_output[var].stage) ) {
+						size_t leng = elix_cstring_length(options->resources.value[i], 0);
+						size_t basename_leng = leng;
+						char * basename = nullptr;
+						for (size_t split = 0; split < leng; split++) {
+							if ( options->resources.value[i][split] == '.') {
+								basename_leng = split +1;
+								break;
+							}
+						}
+						basename = elix_cstring_from(options->resources.value[i], "NUL", basename_leng);
+						elix_file_write_formatted(&file, ninja_extension_output[var].content, basename, options->resources.value[i]);
+						elix_file_write_formatted(&file, "\n");
+
+						char format_buffer[128] = {0};
+						size_t q = snprintf(format_buffer, 128, "%s%s", basename, ninja_extension_output[var].oext);
+						elix_cstring_append(resources, 6144, format_buffer, q);
+						free(basename);
+						break;
+					}
+			}
+
+		}
+		elix_file_write_formatted(&file, ninja_extension_output[3].content, resources);
+		elix_cstring_append(defaults, 255, "${object_dir}/resources ", 24);
+	}
+	*/
+
+	for (size_t j = 0; j < options->modules.current; j++) {
+		size_t i = options->files.current;
+		ConfigList link_objects = {0};
+		uint8_t linking_method = parse_filelist(options->modules.value[j], &options->files, &options->modules, &link_objects);
+
+		char objects_buffer[4096] = {0};
+		char * current_name = j == 0 ? program_name : options->modules.value[j];
+
+		for (; i < options->files.current; i++){
+			for (size_t var = 5; var < ARRAY_SIZE(batch_extension_output); var ++) {
+				if ( !batch_extension_output[var].stage[0] ) {
+					break;
+				}
+				if ( elix_cstring_has_suffix(options->files.value[i], batch_extension_output[var].stage) ) {
+					size_t leng = elix_cstring_length(options->files.value[i], 0);
+					for (size_t split = leng; split > 0; split--) {
+						if ( options->files.value[i][split] == '.') {
+							options->files.value[i][split] = 0;
+							leng = split;
+							break;
+						}
+					}
+					
+					char * no_src_dir = options->files.value[i];
+					size_t ifrst_dir_index = elix_cstring_find_of(options->files.value[i], "/", 0);
+					if ( ifrst_dir_index < 64 ) {
+						no_src_dir  = options->files.value[i] + ifrst_dir_index;
+					}
+
+					size_t q = 0;
+					char format_buffer[1024] = {0};
+					
+					
+					q = snprintf(format_buffer, 1024, batch_extension_output[var].content, no_src_dir, batch_extension_output[var].oext, options->files.value[i]);
+					elix_cstring_append(objects_buffer, 6144, format_buffer, q);
+					
+					q = snprintf(format_buffer, 1024, "${object_dir}%s.%s ", no_src_dir, batch_extension_output[var].oext);
+					elix_cstring_append(objects, 6144, format_buffer, q);
+
+					break;
+				}
+			}
+		}
+
+		switch (linking_method)
+		{
+			case LT_STATIC:
+				LOG_INFO("\tStatic Lib: %s", current_name);
+				elix_file_write_formatted(&file, ":compile_%s \n", current_name);
+				elix_file_write_string(&file, objects_buffer, 0);
+				elix_file_write_formatted(&file, batch_extension_output[2].content, current_name, objects, current_name,current_name);
+				elix_file_write_string(&file, "\tGOTO Exit\n", 0);
+
+				elix_cstring_append(defaults, 1024, "compile_", 10);
+				elix_cstring_append(defaults, 1024, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1024, " ", 1);
+				break;
+			case LT_SHARED:
+				LOG_INFO("\tShared Lib: %s", current_name);
+				elix_file_write_formatted(&file, ":compile_%s \n", current_name);
+				elix_file_write_string(&file, objects_buffer, 0);
+				elix_file_write_formatted(&file, batch_extension_output[1].content, current_name, objects);
+				elix_file_write_string(&file, "\tGOTO Exit\n", 0);
+
+				elix_cstring_append(defaults, 1024, "compile_", 10);
+				elix_cstring_append(defaults, 1024, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1024, " ", 1);
+
+				break;
+			case LT_SKIP:
+				LOG_INFO("\tModule Skipped: %s", current_name);
+				break;
+			default:
+				LOG_INFO("\tProgram: %s", current_name);
+
+				elix_file_write_formatted(&file, ":compile_%s \n", current_name);
+				elix_file_write_string(&file, objects_buffer, 0);
+				elix_file_write_formatted(&file, batch_extension_output[0].content, current_name, objects);
+				elix_file_write_string(&file, "\tGOTO Exit\n", 0);
+
+				elix_cstring_append(defaults, 1024, "compile_", 10);
+				elix_cstring_append(defaults, 1024, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1024, " ", 1);
+
+				break;
+		}
+		elix_file_write_string(&file, "\n", 1);
+		objects[0] = 0;
+	}
+
+	elix_file_write_string(&file, "\n:Commands\n", 0);
+	///TODO: Finished this as well
+	/*
+	if ( find_configmap(&options->options, "finaliser") != SIZE_MAX ) {
+		elix_file_write_formatted(&file, batch_extension_output[2].content, program_name, program_name);
+	} else {
+
+	}
+	*/
+
+	for (size_t j = 0; j < options->modules.current; j++){
+		char * current_name = j == 0 ? program_name : options->modules.value[j];
+		elix_file_write_formatted(&file,"if \"%%1\" == \"%s\" call :compile_%s \n", current_name, current_name);
+
+	}
+	elix_file_write_string(&file,"echo Arg '%1' not valid\n", 0 );
+	elix_file_write_string(&file,":Exit\nexit", 0 );
+
+	for (size_t i = 0; i < ARRAY_SIZE(ini_list); i++){
+		free(ini_list[i].buffer);
+	}
 
 	return 0;
 }
@@ -1535,6 +2512,7 @@ uint32_t fg_config_default(CompilerInfo * target, CurrentConfiguration *options,
 
 
 	elix_file_close(&file);
+	return 1;
 }
 
 uint32_t fg_config_platform(CompilerInfo * target, CurrentConfiguration *options, char * filename ){
@@ -1545,7 +2523,6 @@ uint32_t fg_config_platform(CompilerInfo * target, CurrentConfiguration *options
 			index = i;
 	}
 	
-
 	update_string_from_compilerinfo(config_platform_text[index].text, 1024, target);
 
 	elix_file file;
@@ -1582,8 +2559,6 @@ linking_type scan_directory(const char * directory_path) {
 	return lt;
 }
 
-
-
 uint32_t scan_subdirectory( char * directory_path, elix_file * file) {
 	if ( file == nullptr ) {
 		LOG_INFO("\t Failed reading* : %s", directory_path);
@@ -1617,7 +2592,7 @@ uint32_t scan_subdirectory( char * directory_path, elix_file * file) {
 void directory_to_module( const char * module_name, char * directory_path, linking_type lt) {
 	elix_file temp_file = {0};
 	char temp_filename[512] = "./config/modules/$module.txt";
-	elix_cstring_inreplace(temp_filename, 512, "$module", module_name);
+	elix_cstring_inreplace(temp_filename, 512, "$module", module_name, 0);
 						
 	if ( elix_file_open(&temp_file, temp_filename, EFF_FILE_TRUNCATE) == 0) {
 		LOG_INFO("%s", temp_filename);
@@ -1626,6 +2601,20 @@ void directory_to_module( const char * module_name, char * directory_path, linki
 	} else {
 		LOG_INFO("[Failed] %s", temp_filename);
 	}
+}
+
+uint32_t fg_wildcardfilelist(CompilerInfo * target, CurrentConfiguration *options, char * filename ) {
+	elix_directory * defaults_dir = elix_os_directory_list_files("./"SOURCE_DIRECTORY"/", nullptr);
+
+		elix_file file;
+		if ( elix_file_open(&file, filename, EFF_FILE_TRUNCATE) == 0) {
+			LOG_INFO("\t%s", filename);
+			elix_file_write_string(&file, "./"SOURCE_DIRECTORY"/*.*\n", 0);
+			elix_file_close(&file);
+		} else {
+			LOG_INFO("\t[Failed] %s", filename);
+		}
+	return 0;
 }
 
 uint32_t fg_defaultfilelist(CompilerInfo * target, CurrentConfiguration *options, char * filename ) {
@@ -1695,10 +2684,9 @@ void creeate_newproject(CompilerInfo * target, CurrentConfiguration *options) {
 
 	uint32_t (*file_generator_function[])(CompilerInfo * target, CurrentConfiguration *options, char * filename ) = {
 		&fg_config_default,
-		&fg_defaultfilelist,
+		&fg_wildcardfilelist,
 		&fg_null,
 	};
-
 
 	LOG_INFO("Creating Directories:");
 	for (size_t i = 0; i < ARRAY_SIZE(directories_project); i++) {
@@ -1720,16 +2708,17 @@ void creeate_newproject(CompilerInfo * target, CurrentConfiguration *options) {
 	elix_file_close(&file);
 
 	for (size_t i = 0; i < ARRAY_SIZE(file_generator); i++) 	{
-		elix_cstring_inreplace(file_generator[i], 128, "$platform", target->os);
-		elix_cstring_inreplace(file_generator[i], 128, "$arch", target->arch);
-		elix_cstring_inreplace(file_generator[i], 128, "$compiler", target->compiler);
+		elix_cstring_inreplace(file_generator[i], 128, "$platform", target->os, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$arch", target->arch, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$compiler", target->compiler, 1);
 
 		file_generator_function[i](target, options, file_generator[i]);
 	}
 }
 
-
 void creeate_generator(CompilerInfo * target, CurrentConfiguration *options) {
+	
+	uint8_t batch_mode = target->build_system;
 	elix_file file_check;
 	elix_file_open(&file_check, "./config/default.txt", EFF_FILE_READ);
 	if ( file_check.flag & EFF_FILE_READ_ERROR ) {
@@ -1738,18 +2727,6 @@ void creeate_generator(CompilerInfo * target, CurrentConfiguration *options) {
 	}
 	elix_file_close(&file_check);
 
-/*
-	elix_directory * modules_dir = elix_os_directory_list_files("./config/modules/", ".txt");
-	if ( modules_dir ) {
-		for (size_t a = 0; a < modules_dir->count; ++a) {
-			if ( memcmp(modules_dir->files[a].filename,"base", 5) ) {
-				LOG_INFO("%s", modules_dir->files[a].filename);
-				//options->modules
-			}
-				
-		}
-	}
-*/
 	char directories_generator[][128] = {
 		"./compile/",
 		"./compile/$platform-$arch",
@@ -1758,33 +2735,45 @@ void creeate_generator(CompilerInfo * target, CurrentConfiguration *options) {
 
 	char file_generator[][128] = {
 		"./compile/$platform-$arch/build.ninja",
+		"./run-build-$platform-$mode-$arch.bat",
+		"./run-build-$platform-$mode-$arch.sh",
 	};
 
 	uint32_t (*file_generator_function[])(CompilerInfo * target, CurrentConfiguration *options, char * filename ) = {
 		&fg_build_ninja,
-		&fg_null,
-		&fg_null,
+		&fg_build_batch,
+		&fg_build_shellscript,
 		&fg_null,
 		&fg_null,
 	};
 
+
+	if ( find_configmap(&options->options, "DEBUG") != SIZE_MAX || find_configmap(&options->options, "debug") != SIZE_MAX ) {
+		push_configlist(&options->flags, compiler_debug_options[0].flag);
+		push_configlist(&options->lib_flags, compiler_debug_options[0].libflag);
+		push_configlist(&options->defines, compiler_debug_options[0].define);
+	}
+
+
 	LOG_INFO("Creating Directories");
 	for (size_t i = 0; i < ARRAY_SIZE(directories_generator); i++) 	{
-		elix_cstring_inreplace(directories_generator[i], 128, "$platform", target->os);
-		elix_cstring_inreplace(directories_generator[i], 128, "$arch", target->arch);
-		elix_cstring_inreplace(directories_generator[i], 128, "$compiler", target->compiler);
+		elix_cstring_inreplace(directories_generator[i], 128, "$platform", target->os, 1);
+		elix_cstring_inreplace(directories_generator[i], 128, "$arch", target->arch, 1);
+		elix_cstring_inreplace(directories_generator[i], 128, "$compiler", target->compiler, 1);
 
 		LOG_INFO("\t%s", directories_generator[i]);
 		elix_os_directory_make(directories_generator[i], 755, 1);
 	}
 
-	
 	for (size_t i = 0; i < ARRAY_SIZE(file_generator); i++) 	{
-		elix_cstring_inreplace(file_generator[i], 128, "$platform", target->os);
-		elix_cstring_inreplace(file_generator[i], 128, "$arch", target->arch);
-		elix_cstring_inreplace(file_generator[i], 128, "$compiler", target->compiler);
+		elix_cstring_inreplace(file_generator[i], 128, "$platform", target->os, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$arch", target->arch, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$compiler", target->compiler, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$mode", target->mode, 1);
 	
-		file_generator_function[i](target, options, file_generator[i]);
+		if ( i == batch_mode ) {
+			file_generator_function[i](target, options, file_generator[i]);
+		}
 	}
 
 }
@@ -1814,9 +2803,9 @@ void creeate_newplatform(CompilerInfo * target, CurrentConfiguration *options) {
 
 	LOG_INFO("Creating Directories:");
 	for (size_t i = 0; i < ARRAY_SIZE(directories_generator); i++) 	{
-		elix_cstring_inreplace(directories_generator[i], 128, "$platform", target->os);
-		elix_cstring_inreplace(directories_generator[i], 128, "$arch", target->arch);
-		elix_cstring_inreplace(directories_generator[i], 128, "$compiler", target->compiler);
+		elix_cstring_inreplace(directories_generator[i], 128, "$platform", target->os, 1);
+		elix_cstring_inreplace(directories_generator[i], 128, "$arch", target->arch, 1);
+		elix_cstring_inreplace(directories_generator[i], 128, "$compiler", target->compiler, 1);
 
 		LOG_INFO("\t%s", directories_generator[i]);
 		elix_os_directory_make(directories_generator[i], 755, 1);
@@ -1824,16 +2813,39 @@ void creeate_newplatform(CompilerInfo * target, CurrentConfiguration *options) {
 
 	LOG_INFO("Creating Files");
 	for (size_t i = 0; i < ARRAY_SIZE(file_generator); i++) 	{
-		elix_cstring_inreplace(file_generator[i], 128, "$platform", target->os);
-		elix_cstring_inreplace(file_generator[i], 128, "$arch", target->arch);
-		elix_cstring_inreplace(file_generator[i], 128, "$compiler", target->compiler);
+		elix_cstring_inreplace(file_generator[i], 128, "$platform", target->os, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$arch", target->arch, 1);
+		elix_cstring_inreplace(file_generator[i], 128, "$compiler", target->compiler, 1);
 
 		LOG_INFO("\t%s", file_generator[i]);
 		file_generator_function[i](target, options, file_generator[i]);
 	}
+}
 
+void creeate_editorfiles(CompilerInfo * target, CurrentConfiguration *options, uint32_t editor_id) {
+	char name[5] = UNPACK_ID(editor_id);
+
+	LOG_INFO("Creating Editor files for %s", name);
+
+	elix_file file;
+	for (size_t i = 0; i < ARRAY_SIZE(editor_files); i++) 	{
+		if (editor_files[i].id == editor_id) {
+			LOG_INFO("\t%s", editor_files[i].filename);
+			if ( elix_cstring_has_suffix(editor_files[i].filename, "/") ) {
+				elix_os_directory_make(editor_files[i].filename, 755, 1);
+			} else {
+				if ( elix_file_open(&file, editor_files[i].filename, EFF_FILE_NEW) == 0) {
+					elix_file_write_string(&file, editor_files[i].content, 0);
+				} else {
+					LOG_INFO("\t[Failed] %s", editor_files[i].filename);
+				}
+				elix_file_close(&file);
+			}
+		}
+	}
 
 }
+
 
 void bin_2_header( const char * source_file, const char * target_file, const char * variable_name ) {
 	uint8_t c;
@@ -1859,60 +2871,26 @@ void bin_2_header( const char * source_file, const char * target_file, const cha
 	elix_file_close(&source_stream);
 }
 
-char ** elix_cstring_split( const char * source, char token, char string_bracket) {
-	#define token_cache 8
-	size_t source_len = elix_cstring_length(source, 0);
-	size_t tokens = 0;
-	size_t position[token_cache] = {0};
-	size_t maxlength = 0, last_token = 0;
-	uint8_t outside_string = 1;
-	for (size_t i = 0; i < source_len; i++)	{
-		if ( source[i] == token ) {
-			if ( outside_string ) {
-				maxlength = (i - last_token) > maxlength ? (i - last_token) : maxlength;
-				last_token = i;
-				if (tokens < token_cache ) {
-					position[tokens] = last_token + 1;
-				}
-				tokens++;
+void print_project(CompilerInfo * target) {
+	LOG_INFO("---- [Project] ----");
+	LOG_INFO("---- [Platform] ----");
+	elix_file build_file;
+	if ( elix_file_open(&build_file, "./build.ninja", EFF_FILE_READ) ) {
+
+
+		elix_file_close(&build_file);
+	}
+
+	elix_directory * directory = elix_os_directory_list_files("./config/", ".txt");
+	if ( directory ) {
+		for (size_t b = 0; b < directory->count; ++b) {
+			if ( !elix_os_directory_is(directory->files[b].uri) ) {
+				LOG_INFO("%s", directory->files[b].filename);
 			}
-		} else if ( source[i] == string_bracket ) {
-			outside_string = !outside_string;
 		}
+		elix_os_directory_list_destroy(&directory);
 	}
-	position[tokens] = source_len+1;
-	tokens++;
 
-	char ** output = malloc((tokens+1) * sizeof(char *));
-	if (tokens > token_cache ) {
-		//TODO
-	} else {
-		last_token = 0;
-		for (size_t i = 0; i < tokens; i++)	{
-			output[i] = elix_cstring_from(source + last_token, "", position[i] - last_token);
-			//LOG_INFO("%d > %d - '%s'", last_token, position[i], output[i]);
-			last_token = position[i];
-		}
-		output[tokens] = nullptr;
-	}
-	return output;
-	#undef token_cache
-}
-
-size_t elix_cstring_dequote( char * string ) {
-	size_t length = elix_cstring_length(string, 0);
-
-	while( length && string[0] == '"' ) {
-		memmove(string, string + 1, length);
-		length--;
-	}
-	size_t pos = length ? length-1 : 0;
-	while( pos && string[pos] == '"' ) {
-		string[pos] = 0;
-		length--;
-		pos--;
-	}
-	return length;
 }
 
 void print_help(CompilerInfo * target) {
@@ -1922,10 +2900,11 @@ void print_help(CompilerInfo * target) {
 	LOG_INFO("Target: %s-%s on %s compiler [%s mode]", target->os, target->arch, target->compiler, target->mode);
 	LOG_INFO("System: %s-%s on %s compiler [%s mode]", system.os, system.arch, system.compiler, system.mode);
 	LOG_INFO("Command Argument:");
-	LOG_INFO(" -batch\t\t\t - Create Batch/Shell script instead of Ninja Build (Not Support Yet)");
+	LOG_INFO(" -batch\t\t\t - Create Batch/Shell script instead of Ninja Build (Not fully suypported)");
 	LOG_INFO(" -new\t\t\t - Create New Project");
 	LOG_INFO(" -platform\t\t - Add New Platform");
 	LOG_INFO(" -gen\t\t\t - Generate Build scripts");
+	LOG_INFO(" -editor\t\t\t - [Unfinished] Generate Editor files (Currently only for VSCode)");
 	LOG_INFO(" -c=\t\t\t - Binary to Header, via external command");
 	LOG_INFO(" example: ./genscript.exe -h=a.h -i=a.png.temp -c=\"picasso -o a.png.temp a.png\"");
 
@@ -1933,8 +2912,79 @@ void print_help(CompilerInfo * target) {
 	LOG_INFO("\tPLATFORM={os}");
 	LOG_INFO("\tPLATFORM_ARCH={arch}");
 	LOG_INFO("\tPLATFORM_COMPILER={compiler}");
+	LOG_INFO("\tTARGET_TRIPLET={compiler_prefix} aka 'x86_64-w64-mingw32-'");
 	LOG_INFO("\tRELEASE or DEBUG\n");
 	exit(0);
+}
+
+
+void print_auto_message(CompilerInfo * target) {
+  CompilerInfo system = check_preprocessor();
+  LOG_INFO("Configure Simple Builds system");
+  LOG_INFO("It automatically goes thought 'New Project', 'New Platform' then 'Generate Build Files' Steps.");
+  
+}
+// > CLI
+
+typedef struct {
+	char title[128];
+	uint8_t key;
+	uint8_t return_code;
+	void (*menu_option)(CompilerInfo * target, CurrentConfiguration *options );
+} CLIMenu;
+
+
+
+static CLIMenu menu_root[4] = {
+	{"Create New Project", '1', 255, &creeate_newproject},
+	{"Generate config files for $platform-$arch", '2', 255, &creeate_newplatform},
+	{"Generate Build Script for $platform-$arch", '3', 255, &creeate_generator},
+	{"Exit", 'q', 0, nullptr},
+};
+
+
+uint32_t cli_check_input(CompilerInfo * target, CurrentConfiguration *options, char line[512], CLIMenu * menu, uint32_t menu_count) {
+	uint32_t resul = 1;
+	for (size_t i = 0; i < menu_count; i++) {
+		if ( line[0] == menu[i].key ) {
+			if ( menu[i].return_code == 255 ) {
+				PRINT(" < Running : %s\n", menu[i].title);
+				if ( menu[i].menu_option ) {
+					menu[i].menu_option(target, options);
+				}
+				
+			}
+			resul = menu[i].return_code;
+			break;
+		}
+			
+	}
+
+	return resul;
+}
+
+void cli_display(CompilerInfo * target, CurrentConfiguration *options, CLIMenu * menu, uint32_t menu_count) {
+	PRINT("============================================\n");
+	for (size_t i = 0; i < menu_count; i++) {
+		elix_cstring_inreplace(menu[i].title, 128, "$platform", target->os, 1);
+		elix_cstring_inreplace(menu[i].title, 128, "$arch", target->arch, 1);
+		elix_cstring_inreplace(menu[i].title, 128, "$compiler", target->compiler, 1);
+		PRINT(">%c. %s\n", menu[i].key, menu[i].title);
+	}
+	PRINT("============================================\n");
+	PRINT("Select Options:");
+}
+
+void cli_loop(CompilerInfo * target, CurrentConfiguration *options) {
+	char line[512];
+	uint32_t status;
+
+	do {
+		cli_display(target, options, menu_root, ARRAY_SIZE(menu_root));
+		
+		scanf("%511s", &line);
+		status = cli_check_input(target, options, line, menu_root, ARRAY_SIZE(menu_root));
+	} while (status);
 }
 
 int main(int argc, char * argv[]) {
@@ -1969,7 +3019,6 @@ int main(int argc, char * argv[]) {
 
 	push_configlist(&configuration.modules, "base");
 
-
 	program_mode current_program_mode = PM_AUTO;
 	uint8_t batch = 0;
 	uint8_t release_mode = 0;
@@ -1977,8 +3026,9 @@ int main(int argc, char * argv[]) {
 	CompilerInfo info = check_preprocessor();
 
 	for (uint8_t var = 1; var < argc; ++var) {
-		//LOG_INFO("ARD[%d] %s", var, argv[var]);
 		if ( elix_cstring_has_prefix(argv[var],"-help") ) {
+			current_program_mode = PM_HELP;
+		} else if ( elix_cstring_has_prefix(argv[var],"--help") ) {
 			current_program_mode = PM_HELP;
 		} else if ( elix_cstring_has_prefix(argv[var],"-info") ) {
 			current_program_mode = PM_INFO;
@@ -1994,7 +3044,12 @@ int main(int argc, char * argv[]) {
 		} else if ( elix_cstring_has_prefix(argv[var],"TARGET_TRIPLET=")) {
 			elix_cstring_copy(argv[var]+15, info.triplet);
 		} else if ( elix_cstring_has_prefix(argv[var],"-batch") ) {
-			batch = 1;
+			///Note: info.os_hash should be base system, even if overwritten 
+			if ( info.os_hash == 0xbf7dcc4 ) {
+				batch = 1; //windows batch
+			} else {
+				batch = 2;// shell script
+			}
 		} else if ( elix_cstring_has_prefix(argv[var],"-new") ) {
 			current_program_mode = PM_NEWPROJECT;
 		} else if ( elix_cstring_has_prefix(argv[var],"-platform") ) {
@@ -2003,8 +3058,14 @@ int main(int argc, char * argv[]) {
 			current_program_mode = PM_UPDATEMODULE;
 		} else if ( elix_cstring_has_prefix(argv[var],"-gen") ) {
 			current_program_mode = PM_GEN;
-
-
+		} else if ( elix_cstring_has_prefix(argv[var],"-self") ) {
+			current_program_mode = PM_REBUILDSELF;
+		} else if ( elix_cstring_has_prefix(argv[var],"-editor") ) {
+			current_program_mode = PM_EDITORCONFIG;
+		} else if ( elix_cstring_has_prefix(argv[var],"-switch") ) {
+			current_program_mode = PM_SWITCH;
+		} else if ( elix_cstring_has_prefix(argv[var],"-ask") ) {
+			current_program_mode = PM_INTERACTIVE;
 		} else if ( elix_cstring_has_prefix(argv[var],"-c=") ) {
 			current_program_mode = PM_B2H;
 			push_configmap(&configuration.options, argv[var], 0);
@@ -2015,14 +3076,17 @@ int main(int argc, char * argv[]) {
 
 	if ( find_configmap(&configuration.options, "DEBUG") != SIZE_MAX || find_configmap(&configuration.options, "debug") != SIZE_MAX) {
 		elix_cstring_copy("debug", info.mode);
+	} else if ( find_configmap(&configuration.options, "RELEASE") != SIZE_MAX || find_configmap(&configuration.options, "release") != SIZE_MAX) {
+		elix_cstring_copy("release", info.mode);
+	} else {
+		push_configmap(&configuration.options, info.mode, 0);
 	}
-
 
 	if ( current_program_mode == PM_AUTO ) {
 		char check_platformarch[128] = "./config/$platform-$arch.txt";
 
-		elix_cstring_inreplace(check_platformarch, 128, "$platform", info.os);
-		elix_cstring_inreplace(check_platformarch, 128, "$arch", info.arch);
+		elix_cstring_inreplace(check_platformarch, 128, "$platform", info.os, 1);
+		elix_cstring_inreplace(check_platformarch, 128, "$arch", info.arch, 1);
 
 		elix_file file_check;
 		if ( elix_file_open(&file_check, "./config/default.txt", EFF_FILE_READ) != 0) {
@@ -2038,11 +3102,14 @@ int main(int argc, char * argv[]) {
 		}
 		if ( current_program_mode == PM_AUTO )
 			current_program_mode = PM_GEN;
-		LOG_INFO("---- [AUTO MODE] ----");
+		print_auto_message(&info);
 	}
 
-	
 	switch (current_program_mode) {
+		case PM_EDITORCONFIG:
+			LOG_INFO("---- [Generating Editor Files] ----");
+			creeate_editorfiles(&info, &configuration, PACK_ID('V','S','C','o'));
+			break;
 		case PM_UPDATEMODULE:
 			LOG_INFO("---- [Update Modules] ----");
 			fg_defaultfilelist(&info, &configuration, "./config/modules/base.txt");
@@ -2061,6 +3128,7 @@ int main(int argc, char * argv[]) {
 		case PM_GEN:
 			LOG_INFO("---- [Generating Build Files] ----");
 			LOG_INFO("- Target: %s-%s on %s compiler [%s mode]  [ID:%x]", info.os, info.arch, info.compiler, info.mode,  elix_hash(info.os, elix_cstring_length(info.os, 0)));
+			info.build_system = batch;
 			creeate_generator(&info, &configuration);
 			LOG_INFO("Run ninja to build project");
 			break;
@@ -2082,7 +3150,7 @@ int main(int argc, char * argv[]) {
 
 					//
 					int err = 0;
-
+					LOG_INFO("Running command");
 					#ifdef __WIN32__
 					err = _spawnvp( _P_WAIT, arguments[0], (const char *const *) arguments );
 					#else
@@ -2094,13 +3162,30 @@ int main(int argc, char * argv[]) {
 						LOG_INFO("Can not convert binary to header");
 					} else {
 						LOG_INFO("Converted binary to header");
-						LOG_INFO("Source: %s - Target: %s - Variable: %s", source_string,target_string, path.filename);
+						LOG_INFO("Source: %s - Target: %s - Variable: %s", source_string, target_string, path.filename);
 						bin_2_header( source_string, target_string, path.filename );
 					}
 				}
 			} else {
 				LOG_INFO("Can not convert binary to header");
 			}
+			break;
+		case PM_SWITCH:
+			print_project(&info); 
+			break;
+		case PM_INFO:
+			char * platform_list[] = {
+				"windows", "linux", "bsd", "haiku", "unknown", "3ds", nullptr
+			};
+
+			LOG_INFO("---- [Platform Hash Table] ----");
+			for (size_t i = 0; platform_list[i]; i++) {
+				LOG_INFO("- %s\t\t0x%x", platform_list[i], elix_hash(platform_list[i], elix_cstring_length(platform_list[i], 0)) );
+			}
+
+			break;
+		case PM_INTERACTIVE:
+			cli_loop(&info, &configuration);
 			break;
 		default:
 			print_help(&info);

@@ -14,8 +14,8 @@
  3. This notice may not be removed or altered from any source distribution.
 ***********************************************************************************************************************/
 
-#ifndef ELIX_CORE_HPP
-#define ELIX_CORE_HPP
+#ifndef ELIX_CORE_H
+#define ELIX_CORE_H
 
 // Standard Types
 #ifdef PLATFORM_BEOS // GCC 2.9 - Unlikely to be supported
@@ -23,7 +23,9 @@
 #else
 	#include <stdint.h>
 #endif
-
+#include <stddef.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #define ASSERT(Expression) if(!(Expression)) {__builtin_trap();}
 //#define ASSERT(Expression) if(!(Expression)) {*(int *)0 = 0;}
@@ -33,7 +35,18 @@
 
 #define ARRAYCOUNT(Array) (sizeof(Array) / sizeof((Array)[0]))
 
-#define NULLIFY(f) if (f) { delete f; f = nullptr; }
+// memory management
+#ifdef __cplusplus
+//#define ALLOCATE(TYPE, COUNT) (COUNT > 1 ? new TYPE[COUNT]() : new TYPE())
+//#define NULLIFY(f) if (f) { delete f; f = nullptr; }
+#define ALLOCATE(TYPE, COUNT) (TYPE *)calloc(COUNT, sizeof(TYPE))
+#define NULLIFY(f) if (f != nullptr) { free(f); f = nullptr; }
+#else
+#define nullptr NULL
+#define ALLOCATE(TYPE, COUNT) (TYPE *)calloc(COUNT, sizeof(TYPE))
+#define NULLIFY(f) if (f != nullptr) { free(f); f = nullptr; }
+#endif
+
 
 #define PI32 3.14159265359f
 #define PI64 3.14159265358979323846
@@ -51,78 +64,63 @@
 #endif
 
 
+#ifndef SSIZE_MAX
+	#ifdef _WIN64
+		#define SSIZE_MAX INT64_MAX
+		#define SSIZE_MIN INT64_MIN
+	#else
+		#define SSIZE_MAX INT32_MAX
+		#define SSIZE_MIN INT32_MIN
+	#endif
+#endif
+
+#ifndef __USE_LARGEFILE64
+	#define __USE_LARGEFILE64
+#endif
+
+#ifndef ELIX_FILE_PATH_LENGTH
+	#define ELIX_FILE_PATH_LENGTH 768
+#endif
+#ifndef ELIX_FILE_NAME_LENGTH
+	#define ELIX_FILE_NAME_LENGTH 256
+#endif
+
+
 typedef void* data_pointer; // uintptr_t
 typedef uint32_t bool32;
 typedef uint16_t bool16;
 
-union elix_colour {
+typedef int32_t function_results;
+
+typedef union elix_colour {
 	uint32_t hex;
 	struct { // Note: CLANG  -Wno-gnu-anonymous-struct
+		#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 		uint8_t r;
 		uint8_t g;
 		uint8_t b;
 		uint8_t a;
+		#else
+		uint8_t a;
+		uint8_t b;
+		uint8_t g;
+		uint8_t r;
+		#endif
 	};
-	struct { // Note: CLANG  -Wno-gnu-anonymous-struct
-		uint32_t rgb:24;
-		uint32_t x:8;
-	};
-};
-union elix_sv32_2 { struct{int32_t x; int32_t y;}; struct{int32_t width; int32_t height;}; };
-union elix_uv32_2 { struct{uint32_t x; uint32_t y;}; struct{uint32_t width; uint32_t height;}; };
-struct elix_sv16_2 { int16_t x; int16_t y; };
-struct elix_uv16_2 { uint16_t x; uint16_t y; };
-
-struct elix_graphic_data {
-	union {
-		uint8_t * data;
-		uint32_t * pixels;
-	};
-	uint32_t width;
-	uint32_t height;
-	uint64_t size = 0;
-	uint64_t pixel_count = 0;
-	uint32_t ref = 1;
-	uint8_t bpp = 4;
-	uint8_t format = 0;
-	uint16_t _unsued = 0;
-
-};
-
-struct elix_string {
-	uint8_t * text = nullptr;
-	bool16 owned = true;
-	uint16_t length = 0;
-	uint16_t allocated = 0;
-	uint16_t location = 0;
-};
+} elix_colour;
+typedef union elix_sv32_2 { struct{int32_t x; int32_t y;}; struct{int32_t width; int32_t height;}; } elix_sv32_2;
+typedef union elix_uv32_2 { struct{uint32_t x; uint32_t y;}; struct{uint32_t width; uint32_t height;}; } elix_uv32_2;
+typedef union elix_v64_2 { struct{double x; double y;}; struct{double width; double height;}; } elix_v64_2;
+typedef union elix_v32_2 { struct{float x; float y;}; struct{float width; float height;}; } elix_v32_2;
+typedef struct elix_sv16_2 { int16_t x; int16_t y; } elix_sv16_2;
+typedef struct elix_uv16_2 { uint16_t x; uint16_t y; } elix_uv16_2;
 
 
-struct elix_string_buffer {
-	uint8_t * data = nullptr;
-	uint8_t * iter = nullptr;
-	bool16 owned = true;
-	uint16_t length = 0;
-	uint16_t allocated = 0;
-	uint16_t location = 0;
-};
+typedef struct elix_databuffer {
+	uint8_t * data;
+	uint64_t size;
+} elix_databuffer;
 
-struct elix_databuffer {
-	uint64_t size = 0;
-	uint8_t * data = nullptr;
-};
-
-struct elix_allocated_buffer {
-	uint8_t data[1024];
-	uint16_t data_size = 1024;
-	uint16_t actual_size = 0;
-};
-
-struct elix_path {
-	char * path = nullptr;
-	char * filename = nullptr;
-	char * filetype = nullptr;
-};
 
 #ifndef ELIX_SKIP_CORE_LOG
 	#include <stdio.h>
@@ -131,6 +129,13 @@ struct elix_path {
 
 	#define NAMEDLOG_MESSAGE(N, M, ...) printf("%23s | " M "\n", N, ##__VA_ARGS__)
 	#define LOG_INFO(M, ...) printf( M "\n", ##__VA_ARGS__)
+
+	#ifdef _DEBUG
+		#define PRINT(M, ...) printf( M "\n", ##__VA_ARGS__)
+	#else
+		#define PRINT(M, ...) 
+	#endif
+
 	#define LOG_MESSAGE(M, ...) printf("%24s:%04d | " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 	#define LOGF_MESSAGE(M, ...) printf("%21s() | " M "\n", __func__, ##__VA_ARGS__)
 	#define LOG_ERROR(M, ...) fprintf(LOG_OUTPUT_ERROR, "%18s:%04d | " M "\n",__FILE__, __LINE__, ##__VA_ARGS__)
@@ -142,39 +147,21 @@ struct elix_path {
 	#define LOG_ERROR(M, ...)
 	#define LOGF_MESSAGE(M, ...)
 	#define LOGF_ERROR(M, ...)
+	#define PRINT(M, ...) 
 #endif // ELIX_SKIP_CORE_LOG
 
 
-inline elix_graphic_data * elix_graphic_data_create(elix_uv32_2 dimensions, uint8_t bpp = 4, UNUSEDARG uint8_t format = 0) {
-	elix_graphic_data * buffer = new elix_graphic_data;
+#define RESULTS_SUCCESS 					0x00
+#define RESULTS_FAILED	 					0x01
+#define RESULTS_ERROR						0x80
+#define RESULTS_ERROR_ARGUMENT				0x81
+#define RESULTS_MISSING_CONFIG				0x90
+#define RESULTS_FUNCTION_UNIMPLEMENTED		0xFF
 
-	buffer->width = dimensions.width;
-	buffer->height = dimensions.height;
-	buffer->bpp = bpp;
-	buffer->pixel_count = buffer->width * buffer->height;
-	buffer->size = buffer->pixel_count * buffer->bpp;
-	buffer->pixels = new uint32_t[buffer->pixel_count];
-	return buffer;
-}
+#define RESULTS_NOTFOUND 					0x01
+#define RESULTS_FOUND 						0x00
 
-inline void elix_graphic_data_ref(elix_graphic_data * buffer) {
-	buffer->ref++;
-}
-
-inline elix_graphic_data * elix_graphic_data_destroy(elix_graphic_data * buffer) {
-	buffer->ref--;
-	if ( !buffer->ref ) {
-		NULLIFY(buffer->pixels);
-		buffer->pixel_count = buffer->size = 0;
-		NULLIFY(buffer);
-	}
-	return buffer;
-}
-
-inline void elix_databuffer_free(elix_databuffer * data) {
-	NULLIFY(data->data);
-	data->size = 0;
-}
+#define RESULTS_PENDING						0x02
 
 
-#endif // ELIX_CORE_HPP
+#endif // ELIX_CORE_H
