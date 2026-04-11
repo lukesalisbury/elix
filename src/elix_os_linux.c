@@ -51,7 +51,7 @@ char * elix_program_directory__special_get(ELIX_PROGRAM_DIRECTORY dir_type, cons
 			}
 			//If directory is empty use last item in list
 			if ( !directory[0] ) {
-				elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, dir_list[in - 1], elix_cstring_length(dir_list[in-1], 0));
+				elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, buffer_directory, ELIX_FILE_PATH_LENGTH);
 			}
 			free(dir_list);
 		}
@@ -105,7 +105,7 @@ elix_databuffer elix_os_font(const char * font_name ) {
 		pclose(cmd_output);
 	}
 
-	LOG_MESSAGE("File requested: %s %s", font_name,requested_filename);
+	LOG_MESSAGE("File requested: %s %s", font_name ? font_name : "EMOJI", requested_filename);
 
 	elix_file font_file;
 	if ( elix_file_open(&font_file, requested_filename, EFF_FILE_READ, nullptr) ) {

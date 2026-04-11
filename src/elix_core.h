@@ -129,7 +129,7 @@ typedef struct elix_databuffer {
 
 	#define NAMEDLOG_MESSAGE(N, M, ...) printf("%23s | " M "\n", N, ##__VA_ARGS__)
 	#define LOG_INFO(M, ...) printf( M "\n", ##__VA_ARGS__)
-
+	
 	#ifdef _DEBUG
 		#define PRINT(M, ...) printf( M "\n", ##__VA_ARGS__)
 	#else
@@ -156,7 +156,9 @@ typedef struct elix_databuffer {
 #define RESULTS_ERROR						0x80
 #define RESULTS_ERROR_ARGUMENT				0x81
 #define RESULTS_MISSING_CONFIG				0x90
+#define RESULTS_UNKNOWN						0xE0
 #define RESULTS_FUNCTION_UNIMPLEMENTED		0xFF
+
 
 #define RESULTS_NOTFOUND 					0x01
 #define RESULTS_FOUND 						0x00

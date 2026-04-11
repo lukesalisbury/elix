@@ -22,10 +22,10 @@
 				}
 			],
 			"preLaunchTask": "Build",
-
+			"program": "${workspaceFolder}/bin/test-debug-linux-x86_64",
 			"linux": {
 				"miDebuggerPath": "/usr/bin/gdb",
-				"program": "${workspaceFolder}/bin/pixel_edit-debug-linux-x86_64",
+				"program": "${workspaceFolder}/bin/test-debug-linux-x86_64",
 				"args": [],
 
 			},

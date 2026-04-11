@@ -619,38 +619,64 @@ rgbabuffer_font * rbgabuffer__loadFont(rbgabuffer_context* ctx, const char * fon
 		}
 	}
 
-	
-
 	return font;
 }
 
-
+float missing_glyph_bitmap[64] = { 
+	255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f,
+	255.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f,
+	255.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f,
+	255.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f,
+	255.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f,
+	255.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f,
+	255.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 255.0f,
+	255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f, 255.0f,
+};
 
 void rgbabuffer__fillChar(rbgabuffer_context* ctx, rgbabuffer_font * font, uint32_t character, float * x, float *y, uint32_t next_character) {
 	if ( !font || !font->info.numGlyphs) {
+		if ( ctx->emoji == font) {
+			for ( int32_t j = 0; j < 8; ++j) {
+				for ( int32_t i = 0; i < 8; ++i) {
+					rbgabuffer__pixel(ctx, 0xFF000000, *x+i, *y+j, missing_glyph_bitmap[(j*8)+i]);
+				}
+			}
+			
+			*x += 8.0f;
+		}
+
 		return;
 	}
+
 	int index = stbtt_FindGlyphIndex(&font->info, character);
-	if (character > 127 && !index) {
-		printf("non-ascii %d %d\n", character, index);
+	if (character > 127) {
+		if (!index)
+			printf("non-ascii %d %d\n", character, index);
+		else
+			printf("Unicode %d %d\n", character, index);
 	}
 
-	if ( index ) {
-		float scale = stbtt_ScaleForPixelHeight(&font->info, ctx->font_size_px);
-		float baseline = (font->base_ascent * scale);
-		int advance_width, left_sidebearing,width, height, xoff, yoff;
+	float scale = stbtt_ScaleForPixelHeight(&font->info, ctx->font_size_px);
+	float baseline = (font->base_ascent * scale);
+	int advance_width = 0, left_sidebearing= 0,width= 0, height = 0, xoff = 0, yoff = 0;
 
-		uint8_t * bitmap = stbtt_GetGlyphBitmap(&font->info, 0, scale, index, &width, &height, &xoff, &yoff);
+	if ( index ) {
+		uint8_t * bitmap = stbtt_GetGlyphBitmap(&font->info, scale, scale, index, &width, &height, &xoff, &yoff);
 
 		stbtt_GetGlyphHMetrics(&font->info, character, &advance_width, &left_sidebearing);
-
+		
 		for ( int32_t j = 0; j < height; ++j) {
 			for ( int32_t i = 0; i < width; ++i) {
-				float alpha = (float)bitmap[(j*width)+i] / 255.0;
+				float alpha = 0.0f;
+				if ( bitmap) {
+					alpha = (float)bitmap[(j*width)+i] / 255.0;
+				} else {
+					alpha = (float)(j*width)+i / 255.0;
+				}
 				rbgabuffer__pixel(ctx, 0xFF000000, *x+i, *y+j+yoff+baseline, alpha);
 			}
 		}
-
+		
 		*x += (float)advance_width * scale;
 		if ( next_character ) {
 			*x += scale * stbtt_GetCodepointKernAdvance(&font->info, character, next_character);
@@ -662,6 +688,8 @@ void rgbabuffer__fillChar(rbgabuffer_context* ctx, rgbabuffer_font * font, uint3
 }
 
 
+
+
 //TODO: cache 
 void rbgabuffer_FillText(rbgabuffer_context* ctx, const char * text, float x, float y, float maxWidth) {
 	rgbabuffer_font * font = rbgabuffer__loadFont(ctx, rbgabuffer_DEFAULT_FONTFAMILY);
@@ -670,10 +698,12 @@ void rbgabuffer_FillText(rbgabuffer_context* ctx, const char * text, float x, fl
 	}
 
 	char * object = (char*)text;
+	char * next_object = object;
 	uint32_t current_character = 0, next_character = 0;
-	while ( (current_character = elix_cstring_next_character(object)) > 0  ) {
-		next_character = elix_cstring_peek_character(object);
+	while ( (current_character = elix_cstring_next_character(object, &next_object)) > 0  ) {
+		next_character = elix_cstring_peek_character(next_object);
 		rgbabuffer__fillChar(ctx, font, current_character, &x, &y, next_character);
+		object = next_object;
 	}
 	NULLIFY(font);
 }
@@ -687,11 +717,11 @@ elix_text_metrics rbgabuffer_measureText(rbgabuffer_context* ctx, const char * t
 	int baseline = (int) (ascent * font_scale);
 	int descent_scaled = (int) (descent * font_scale);
 
-	char * object = (char*)text;
+	char * object, * next_object = (char*)text;
 	uint32_t current_character = 0, next_character = 0;
-	while ( (current_character = elix_cstring_next_character(object)) > 0  ) {
-		next_character = elix_cstring_peek_character(object);
-
+	while ( (current_character = elix_cstring_next_character(object, &next_object)) > 0  ) {
+		next_character = elix_cstring_peek_character(next_object);
+		object = next_object;
 		int x0, y0, x1, y1;
 		int advance, lsb;
 
@@ -727,7 +757,9 @@ rbgabuffer_context * rbgabuffer_create_context(elix_graphic_data * external_buff
 	context->commands.max = 32;
 	context->commands.array = (float*)malloc( sizeof(float)*context->commands.max);
 
+	context->font_size_px = rbgabuffer_DEFAULT_FONTSIZE;
 	context->emoji = rbgabuffer__loadFont(context, nullptr);
+	context->loaded_font = rbgabuffer__loadFont(context, rbgabuffer_DEFAULT_FONTFAMILY);
 
 	return context;
 }

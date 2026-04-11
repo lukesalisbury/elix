@@ -222,6 +222,6 @@ pip-log.txt
 
 
 .vscode/*
-genscript.exe
 *.a
 .ninja_log
+gsb.exe

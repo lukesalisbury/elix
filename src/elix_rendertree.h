@@ -17,7 +17,7 @@ it and redistribute it freely, subject to the following restrictions:
 #define ELIX_RENDERTREE_HEADER
 
 #include "elix_core.h"
-
+#include "elix_rgbabuffer.h"
 
 typedef int32_t elix_dimension;
 
@@ -42,12 +42,11 @@ typedef enum {
 	ERTS_HIDDEN = 0x02
 } elix_rendertree_state;
 
-
 typedef struct elix_rendertree_itemlist elix_rendertree_itemlist;
 typedef struct elix_rendertree_item elix_rendertree_item;
 typedef struct elix_rendertree_itempool {
 	uint8_t used;
-	data_pointer values[8];
+	elix_rendertree_item * values[8];
 } elix_rendertree_itempool;
 
 typedef struct elix_rendertree_itemlist {
@@ -55,12 +54,10 @@ typedef struct elix_rendertree_itemlist {
 	elix_rendertree_itemlist * next;
 } elix_rendertree_itemlist;
 
-
 typedef struct elix_rendertree_styletext {
 	char * text;
 	uint8_t animated, changed, unknown1, unknown2;
 } elix_rendertree_styletext;
-
 
 typedef struct elix_rendertree_style {
 	elix_rendertree_styletext top, left, width, height;
@@ -87,6 +84,14 @@ typedef struct elix_rendertree {
 	elix_dimension width, height;
 } elix_rendertree;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // ELIX_RENDERTREE_HEADER

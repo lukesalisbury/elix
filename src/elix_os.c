@@ -129,7 +129,7 @@ elix_program_info elix_program_info_create(const char* arg0 , const  char * prog
 	elix_cstring_copy("TODO", info.user, 16);
 	// GetUserNameEx(NameDisplay, info.user, nullptr);
 	elix_cstring_copy(getenv("USER"), info.user, 16);
-
+	info.resource_directory_type = EPRD_AUTO;
 	info.program_name = elix_cstring_from(program_name, "elix_example", 64);
 	info.program_version = elix_cstring_from(version, "Testing", 64);
 	if ( version_level == nullptr ) {
@@ -197,22 +197,25 @@ extern inline void elix_path__real(char * path, size_t len) {
 char * elix_program_directory_documents( const elix_program_info * program_info, bool shared, const char * filename ){
 	ASSERT(program_info != nullptr);
 
-	uint8_t errors = 0;
+	size_t extras = 0;
 	size_t name_len = elix_cstring_length(filename, 0);
 	size_t sub_len = elix_cstring_length(program_info->program_directory, 0);
 	char * directory = nullptr;
 
 	directory = elix_program_directory__special_get((shared ? EPDS_DOCS_PUBLIC : EPDS_DOCS_PRIVATE), program_info->program_directory, name_len+sub_len+2);
-
-	errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-	errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, program_info->program_directory, sub_len);
-
-	if ( filename ) {
-		errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-		errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
+	if ( !directory ) {
+		return nullptr;
 	}
 
-	if ( errors ) {
+	extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
+	extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, program_info->program_directory, sub_len);
+
+	if ( filename ) {
+		extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
+		extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
+	}
+
+	if ( !extras ) {
 		NULLIFY(directory);
 		return nullptr;
 	} else {
@@ -248,82 +251,88 @@ char * elix_program_directory_user( const elix_program_info * program_info, bool
 
 }
 
+char * elix_program_directory__resources_get( const elix_program_info * program_info, uint32_t resource_directory_type, size_t name_len) {
+	char * directory = nullptr;
+	size_t dir_len = 0;
+	
+	switch (resource_directory_type) {
+		case EPRD_DATA:
+			dir_len = snprintf( nullptr, 0, "%s/%s_data", program_info->path_executable.path, program_info->path_executable.filename ); 
+			dir_len += name_len + 2;
+			directory = ALLOCATE(char, dir_len);
+			snprintf ( directory, dir_len, "%s/%s_data", program_info->path_executable.path, program_info->path_executable.filename );
+			break;
+		case EPRD_PARENT_SHARE:
+			dir_len = snprintf( nullptr, 0, "%s/../share/%s", program_info->path_executable.path, program_info->program_directory );
+			dir_len += name_len + 2;
+			directory = ALLOCATE(char, dir_len);
+			snprintf( directory, dir_len, "%s/../share/%s", program_info->path_executable.path, program_info->program_directory );
+			elix_path__real(directory, dir_len);
+			break;
+		case EPRD_SHARE:
+			dir_len = snprintf ( nullptr, 0, "%s/share/%s", program_info->path_executable.path, program_info->program_directory );
+			dir_len += name_len + 2;
+			directory = ALLOCATE(char, dir_len);
+			snprintf ( directory, dir_len, "%s/share/%s", program_info->path_executable.path, program_info->program_directory );
+			break;
+		case EPRD_GLOBAL:
+			directory = elix_program_directory__special_get(EPDS_DOCS_PUBLIC, program_info->program_directory, name_len+2);
+			break;
+	}
+	return directory;
 
-char * elix_program_directory_resources( const elix_program_info * program_info, const char * filename, UNUSEDARG uint8_t override_lookup ) {
+}
+
+
+char * elix_program_directory_resources( const elix_program_info * program_info, const char * filename, uint8_t override_lookup ) {
 	ASSERT(program_info != nullptr);
 
 	uint8_t errors = 0;
 	size_t dir_len = 0, name_len = 0;
 	char * directory = nullptr;
+	uint32_t resource_directory_type = program_info->resource_directory_type;
 
 	if ( filename != nullptr ) {
 		name_len = elix_cstring_length(filename,0);
 	}
 
-	if ( program_info->resource_directory_type == EPRD_DATA || program_info->resource_directory_type == EPRD_AUTO ) {
-		dir_len = snprintf ( nullptr, 0, "%s/%s_data", program_info->path_executable.path, program_info->path_executable.filename );
-		dir_len += name_len + 2;
-		directory = ALLOCATE(char, dir_len);
-		snprintf ( directory, dir_len, "%s/%s_data", program_info->path_executable.path, program_info->path_executable.filename );
-		if ( elix_os_directory_is(directory, nullptr)) {
-			if ( filename != nullptr ) {
-				errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-				errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
-			}
-			return directory;
-		}
-		NULLIFY(directory)
+	if ( override_lookup != EPRD_AUTO ) {
+		resource_directory_type = override_lookup;
 	}
 
-	if ( program_info->resource_directory_type == EPRD_SHARE_IN_PARENT || program_info->resource_directory_type == EPRD_AUTO ) {
-		dir_len = snprintf ( nullptr, 0, "%s/../share/%s", program_info->path_executable.path, program_info->program_directory );
-		dir_len += name_len + 2;
-		directory = ALLOCATE(char, dir_len);
-		snprintf ( directory, dir_len, "%s/../share/%s", program_info->path_executable.path, program_info->program_directory );
-		elix_path__real(directory, dir_len);
-		if ( elix_os_directory_is(directory, nullptr) ) {
-			if ( filename != nullptr ) {
-				errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-				errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
+	if ( resource_directory_type == EPRD_AUTO ){
+		for( uint32_t t = EPRD_SHARE; t <= EPRD_DATA; t++) {
+			directory = elix_program_directory__resources_get( program_info, EPRD_DATA, name_len);
+			dir_len = elix_cstring_length(directory, 0);
+			if (  elix_os_directory_is(directory, nullptr)) {
+				if ( filename != nullptr ) {
+					errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
+					errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
+				}
+				return directory;
 			}
-			return directory;
+			NULLIFY(directory)
 		}
-		NULLIFY(directory)
+	} else {
+		directory = elix_program_directory__resources_get( program_info, resource_directory_type, name_len);
+		dir_len = elix_cstring_length(directory, 0);
 
-	}
-
-	if ( program_info->resource_directory_type == EPRD_SHARE || program_info->resource_directory_type == EPRD_AUTO ) {
-		dir_len = snprintf ( nullptr, 0, "%s/share/%s", program_info->path_executable.path, program_info->program_directory );
-		dir_len += name_len + 2;
-		directory = ALLOCATE(char, dir_len);
-		snprintf ( directory, dir_len, "%s/share/%s", program_info->path_executable.path, program_info->program_directory );
-		if ( elix_os_directory_is(directory, nullptr)) {
-			if ( filename != nullptr ) {
-				errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-				errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
-			}
-			return directory;
-		}
-		NULLIFY(directory)
-	}
-
-	if ( program_info->resource_directory_type == EPRD_GLOBAL || program_info->resource_directory_type == EPRD_AUTO ) {
-		//TODO: Remove hardcode path
-		dir_len = snprintf ( nullptr, 0, "/usr/share/%s", program_info->program_directory );
-		dir_len += name_len + 2;
-		directory = ALLOCATE(char, dir_len);
-		snprintf ( directory, dir_len, "/usr/share/%s", program_info->program_directory );
 		if ( filename != nullptr ) {
 			errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
 			errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
 		}
-		NULLIFY(directory)
+		return directory;
+
+		if ( !elix_os_directory_is(directory, nullptr)) {
+			LOG_ERROR("elix_program_directory_resources directory doesn't exist: %s", directory);
+		}
 	}
+
+	LOG_ERROR("elix_program_directory_resources failed due to type failure.");
 	return nullptr;
 }
 
 char * elix_program_directory_cache_file( const elix_program_info * program_info, const char * filename) {
-
 	return elix_program_directory_user(program_info, true, filename);
 }
 

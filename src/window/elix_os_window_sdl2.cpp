@@ -13,7 +13,7 @@ void elix_os_clipboard_put(const char * utfstring) {
 
 elix_os_window * elix_os_window_create( elix_uv32_2 dimension, elix_uv16_2 scale, const char * title) {
 
-	elix_os_window * win = new elix_os_window;
+	elix_os_window * win = new elix_os_window();
 
 	uint32_t flags = SDL_WINDOW_SHOWN;
 

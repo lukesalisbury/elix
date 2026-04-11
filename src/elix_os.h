@@ -76,9 +76,9 @@ struct elix_path_uri {
 enum elix_program_resource_directory {
 	EPRD_AUTO,
 	EPRD_SHARE, // ./share/"executable"/
-	EPRD_SHARE_IN_PARENT, // ../share/"executable"/ 
+	EPRD_PARENT_SHARE, // ../share/"executable"/ 
 	EPRD_DATA, // ./"executable"_data/
-	EPRD_GLOBAL, // /usr/share/"program_directory"/
+	EPRD_GLOBAL, // /usr/share/"program_directory"/	
 };
 
 typedef struct elix_program_info {

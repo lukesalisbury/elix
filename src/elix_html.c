@@ -79,12 +79,12 @@ bool doesInsensitiveStringMatch(uint32_t c, elix_html_parse_next_info info, elix
 
 
 void elix_html_nodelist_push(elix_html_nodelist * nl, elix_html_node node) {
-	if ( !nl || !nl->active.used) {
+	if ( !nl ) {
 		LOG_ERROR("Invalid elix_html_nodelist");
 		return;
 	}
 	if ( nl->active.used < 8 ) {
-		nl->active.values[nl->active.used && 0x07] = node;
+		nl->active.values[nl->active.used & 0x07] = node;
 		nl->active.used++;
 		return;
 	}
@@ -99,12 +99,12 @@ void elix_html_nodelist_push(elix_html_nodelist * nl, elix_html_node node) {
 }
 
 void elix_html_attrlist_push(elix_html_attrlist * nl, elix_html_attr node) {
-	if ( !nl || !nl->active.used) {
+	if ( !nl ) {
 		LOG_ERROR("Invalid elix_html_attrlist_push");
 		return;
 	}
 	if ( nl->active.used < 8 ) {
-		nl->active.values[nl->active.used && 0x07] = node;
+		nl->active.values[nl->active.used & 0x07] = node;
 		nl->active.used++;
 		return;
 	}
@@ -116,6 +116,20 @@ void elix_html_attrlist_push(elix_html_attrlist * nl, elix_html_attr node) {
 		return;
 	}
 	elix_html_attrlist_push(nl->next, node);
+}
+
+elix_html_attr elix_html_attrlist_get(elix_html_attrlist * nl, uint16_t index) {
+	if (!nl || !nl->active.used) {
+		LOG_ERROR("Invalid elix_html_attrlist");
+		return nullptr;
+	}
+	if (nl->active.used > index) {
+		return (elix_html_attr)nl->active.values[(index) & 0x07];
+	}
+	if (nl->next) {
+		return elix_html_attrlist_get(nl->next, index - 8);
+	}
+	return nullptr;
 }
 
 elix_html_attr elix_html_attrlist_get_last(elix_html_attrlist * nl) {
@@ -134,7 +148,7 @@ elix_html_attr elix_html_attrlist_get_last(elix_html_attrlist * nl) {
 
 elix_html_node elix_html_nodelist_get(elix_html_nodelist * nl, uint16_t index) {
 	if (!nl || !nl->active.used) {
-		LOG_ERROR("Invalid elix_html_attrlist");
+		LOG_ERROR("Invalid elix_html_nodelist");
 		return nullptr;
 	}
 	if (nl->active.used > index) {
@@ -164,6 +178,7 @@ elix_html_node elix_html_node_push(elix_html_node current_node, uint8_t type, el
 	elix_html_node next_node;
 	if ( current_node == nullptr ) {
 		next_node = doc->root;
+		next_node->type = type;
 	} else {
 		next_node = ALLOCATE(elix_html_node_object, 1);
 		next_node->type = type;
@@ -227,13 +242,12 @@ elix_html_node elix_html_get_node_by_tag_from_list(elix_html_nodelist * node_lis
 
 elix_html_node elix_html_get_node_by_tag(elix_html_node parent_node, const char * name) {
 	return elix_html_get_node_by_tag_from_list(&parent_node->children, name);
-	
 }
 
 elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * lastStatus) {
-	bool debug = false;
-	elix_html_node current_node;
-	elix_parse_status current;
+	uint8_t debug = 0;
+	elix_html_node current_node = nullptr;
+	elix_parse_status current = {};
 
 	current.length = doc->reference->length;
 	if ( lastStatus != nullptr ) {
@@ -261,9 +275,9 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 
 	int d = 0;
 	size_t text_length = 0;
-	elix_html_parse_next_info reset_parse_next_info;
-	elix_html_parse_next_info comment_next;
-	elix_html_parse_next_info scan_next;
+	elix_html_parse_next_info reset_parse_next_info = {};
+	elix_html_parse_next_info comment_next = {};
+	elix_html_parse_next_info scan_next = {};
 	uint32_t counter = 0;
 	do {
 		char32 = elix_character_next(doc->reference);
@@ -274,6 +288,8 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 		if ( char32.value ) {
 			switch (state) {
 				case PARSE_TAG: {
+					if (debug == 2)
+						printf("PARSE_TAG " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					if ( isVoidTagChar(char32.value) ) {
 						/* / */ 
 						state = STATECHANGE(PARSE_END_TAG, d);
@@ -298,6 +314,8 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_START_TAG: {
+					if (debug == 2)
+						printf("PARSE_START_TAG " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					if ( isValidNameChar(char32.value, 0) ) {
 						/* a-z or 0-9 */
 						state = STATECHANGE(PARSE_START_TAG, d);
@@ -305,11 +323,15 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					} else if ( char32.value == ' ' ) {
 						/* If space switch to attributes*/
 						current_node = elix_html_node_push_element(current_node, doc, &buffer);
+						if ( debug )
+							printf("<+> name:'%s'\n", current_node->name );
 						state = STATECHANGE(PARSE_ATTRIBUTE_KEY, d);
 						elix_string_clear(&buffer);
 					} else if ( char32.value == '>' ) {
 						// finish opening tag
 						current_node = elix_html_node_push_element(current_node, doc, &buffer);
+						if ( debug )
+							printf("<+> name:'%s'\n", current_node->name );
 						state = STATECHANGE(PARSE_NONE, d);
 						d++;
 					} else {
@@ -320,10 +342,13 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_SCAN_DOCTYPE: {
+					if (debug == 2)
+						printf("PARSE_SCAN_DOCTYPE " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					//TODO check if > is not in quotes
 					if ( char32.value == '>' ) {
+						if ( debug )
+							printf("<!>\n" );
 						state = STATECHANGE(PARSE_NONE, d);
-						printf("Doctype '%*s'\n", buffer.length, buffer.text);
 						elix_string_clear(&buffer);
 					} else {
 						elix_string_append( &buffer, char32.value );
@@ -331,6 +356,8 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_SCAN_COMMENT: {
+					if (debug == 2)
+						printf("PARSE_SCAN_COMMENT " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					bool f = doesStringMatch(char32.value, scan_next, comment_end, &state);
 					if ( f ) {
 						//if comment_end is found, return to parse to none
@@ -355,12 +382,16 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_SCAN_CDATA: {
+					if (debug == 2)
+						printf("PARSE_SCAN_CDATA " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					bool f = doesStringMatch(char32.value, scan_next, cdata_end, &state);
 					if ( f ) {
 						//if comment_end is found, return to parse to none
 						if ( state == PARSE_SCAN_CDATA ) {
 							scan_next.index++;
 						} else {
+							if ( debug )
+							printf("<VOID>\n" );
 							current_node = elix_html_node_push_void(current_node, doc, &buffer, &current);
 							current_node = current_node->parent;
 							state = STATECHANGE(PARSE_NONE, d);
@@ -383,7 +414,9 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					//<!doctype				>
 					//<!--					-->
 					//<![CDATA[				]]>
-
+					if (debug == 2)
+						printf("PARSE_COMMENT " pZU ": %d %c\n", current.offset, char32.value, char32.value);
+						
 					if (comment_next.state == PARSE_NONE) { //First Char
 						if ( doesInsensitiveStringMatch(char32.value, comment_next, doctype_start, &comment_next.state) ) {
 						} else if ( doesStringMatch(char32.value, comment_next, comment_start, &comment_next.state ) ) {
@@ -408,16 +441,19 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_END_TAG: {
+					if (debug == 2)
+						printf("PARSE_END_TAG " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					if ( isValidNameChar(char32.value, 0) ) {
 						state = STATECHANGE(PARSE_END_TAG, d);
 						elix_string_append( &buffer, char32.value );
 					} else if ( char32.value == '>' ) {
+						if ( debug )
+							printf("<-> name:'%s'\n", current_node->name );
 						state = STATECHANGE(PARSE_NONE, d);
 
 						current_node->textContent.length = buffer.length;
 
 						if (current_node->children.active.used == 1 ) {
-						
 							if (((elix_html_node)current_node->children.active.values[0])->type == ELEMENT_RAWTEXT)
 								current_node->textContent = ((elix_html_node)current_node->children.active.values[0])->textContent;
 						}
@@ -433,7 +469,11 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_SCAN_TEXT: {
+					if (debug == 2)
+						printf("PARSE_SCAN_TEXT " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					if ( isOpenTagChar(char32.value) ) {
+						if ( debug == 1 )
+							printf("[TEXT]\n");
 						current_node = elix_html_node_push_text(current_node, doc, &current, &text_length);
 						current_node = current_node->parent;
 						state = STATECHANGE(PARSE_TAG, d);
@@ -444,13 +484,15 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_ATTRIBUTE_KEY: {
+					if (debug == 2)
+						printf("PARSE_ATTRIBUTE_KEY " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					/*
 					 if isValidNameChar set as name, if > name & tag if finished. = switch to valve scan
 					*/
 					if ( char32.value == '>' ) {
 						//close attr
 						if ( buffer.length ) {
-							elix_html_attr new_attribute = {0};
+							elix_html_attr new_attribute = ALLOCATE(elix_html_attr_object, 1);
 							new_attribute->name = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length, buffer.length);
 							elix_html_attrlist_push(&current_node->attribute, new_attribute);
 
@@ -465,7 +507,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 						///NOTE:  
 						//If buffer has content, space ends it.
 						if ( buffer.length ) {
-							elix_html_attr new_attribute = {0};
+							elix_html_attr new_attribute = ALLOCATE(elix_html_attr_object, 1);
 							new_attribute->name = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length, buffer.length);
 							elix_html_attrlist_push(&current_node->attribute, new_attribute);
 
@@ -474,7 +516,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 							elix_string_clear(&buffer);
 						}
 					} else if ( char32.value == '=' ) {
-						elix_html_attr new_attribute = {0};
+						elix_html_attr new_attribute = ALLOCATE(elix_html_attr_object, 1);
 						new_attribute->name = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length, buffer.length);
 						elix_html_attrlist_push(&current_node->attribute, new_attribute);
 
@@ -490,6 +532,8 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				case PARSE_ATTRIBUTE: {
+					if (debug == 2)
+						printf("PARSE_ATTRIBUTE " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					//Get current attribute
 					if ( char32.value == '"' ) {
 						// Start or end value
@@ -519,6 +563,8 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 					break;
 				}
 				default: {
+					if (debug == 2)
+						printf("PARSE_NONE " pZU ": %d %c\n", current.offset, char32.value, char32.value);
 					if ( isOpenTagChar(char32.value) ) {
 						state = STATECHANGE(PARSE_TAG, d);
 						elix_string_clear(&buffer);
@@ -552,19 +598,26 @@ elix_html_document * elix_html_open( elix_string_buffer * content) {
         ///NOTE: Reference may be freed elsewhere
 		doc->reference = content;
 	} else {
-		LOG_ERROR("Error: HTML pages must start <\n");
+		LOG_ERROR("Error: HTML pages must start <");
 	}
 	elix_html_parse(doc, &status);
 	return doc;
 }
 
-void elix_html_printNode(elix_html_node * node, size_t * d) {
-	ASSERT(node);
-	/*
+void elix_html_close(elix_html_document * doc) {
+	///TODO: Write this function, deleting each node & attr
+
+	LOG_ERROR("FUNCTION NOT WRITTEN YET");
+
+}
+
+
+void elix_html_printNode(elix_html_node obj, size_t d) {
+	ASSERT(obj);
+	
 	for (size_t var = 0; var < d; ++var) {
-		printf(" ");
+		printf("-");
 	}
-	elix_html_node_object * obj = node->get();
 
 	//ELEMENT_FOREIGN,
 	//ELEMENT_VOID,
@@ -572,7 +625,6 @@ void elix_html_printNode(elix_html_node * node, size_t * d) {
 	//ELEMENT_RAWTEXT,
 	//ELEMENT_RAWTEXTAREA,
 	//ELEMENT_NORMAL
-
 
 	switch (obj->type) {
 		case ELEMENT_RAWTEXT:
@@ -588,14 +640,16 @@ void elix_html_printNode(elix_html_node * node, size_t * d) {
 				printf("(ELEMENT_VOID) '%.*s'\n", (int)obj->textContent.length, obj->textContent.string);
 			break;
 		case ELEMENT_NORMAL:
-			if ( !obj->attribute.empty() ) {
+			if ( obj->attribute.active.used ) {
 				printf("[%s", obj->name);
-				for (elix_html_attr a: obj->attribute) {
-					if ( a.value.length ) {
-						printf(" (%.*s", (int)a.name.length, a.name.string);
-						printf(":%.*s)", (int)a.value.length, a.value.string);
+				///BUG: Only prints first 8 children, need to loop through nodelist 
+				for (uint16_t index = 0; index < obj->attribute.active.used; index++) {
+					elix_html_attr a = elix_html_attrlist_get(&obj->attribute, index);
+					if ( a->value.length ) {
+						printf(" (%.*s", (int)a->name.length, a->name.string);
+						printf(":%.*s)", (int)a->value.length, a->value.string);
 					} else {
-						printf(" %.*s", (int)a.name.length, a.name.string);
+						printf(" %.*s", (int)a->name.length, a->name.string);
 					}
 				}
 				printf("]\n");
@@ -614,145 +668,41 @@ void elix_html_printNode(elix_html_node * node, size_t * d) {
 			break;
 	}
 
-	for (elix_html_node q: node->get()->children) {
-		d++;
-		elix_html_printNode(&q, d);
-		d--;
+	if ( obj->children.active.used ) {
+		for (uint16_t index = 0; index < obj->children.active.used; index++) {
+			elix_html_node q = elix_html_nodelist_get(&obj->children, index);
+			d++;
+			if ( q ) {
+				elix_html_printNode(q, d);
+			} else {
+				printf("Invalid Node %d\n", index);
+			}
+			d--;
+		}
 	}
-		*/
+
 }
 
 
 void elix_html_print(elix_html_document * doc) {
 	size_t d = 0;
 
-	if (doc->root->type) {
-		elix_html_printNode(&doc->root, &d);
+	if (doc->root) {
+		//Replace newlines with Next Line. This function is use for testing parse results
+		for (uint32_t c = 0; c < doc->reference->length; c++) {
+			if ( doc->reference->data[c] == '\n' )
+				doc->reference->data[c]  = 133;
+		}
+
+		elix_html_printNode(doc->root, d);
+
+		for (uint32_t c = 0; c < doc->reference->length; c++) {
+			if ( doc->reference->data[c] == 133 )
+				doc->reference->data[c] = '\n';
+		}
+
 	} else {
 		printf("No Root Node found\n");
 	}
 }
-/*
-	void attached_rendertree_item(elix_html_node_object * node, elix_rendertree_item * item) {
-		node->render_item.children.insert(node->render_item.children.end(), 1, item);
-	}
-
-	void deattached_rendertree_item(elix_html_node_object * node, elix_rendertree_item * item) {
-		node->render_item.children.insert(node->render_item.children.end(), 1, item);
-	}
-
-
-	void update_rendertree_item(elix_html_document * doc, elix_html_node &node, elix_rendertree_item *& item) {
-		node_object * obj = node.get();
-		switch (obj->type) {
-			case ELEMENT_RAWTEXT:
-				item->render_style.backgroundColour.hex = 0x000000FF;
-				item->data = &obj->textContent;
-				item->data_type = ERTD_STRING;
-				item->render_style.display = ERT_INLINEBLOCK;
-				break;
-			case ELEMENT_NORMAL:
-				item->data_type = ERTD_EMPTY;
-				item->render_style.display = ERT_BLOCK;
-
-				//item->data = &obj->textContent;
-				break;
-			default:
-				item->data_type = ERTD_EMPTY;
-				break;
-		}
-
-		for (elix_rendertree_item *  q: item->children) {
-
-
-		}
-	}
-
-	void update_render_tree(elix_html_node * node, elix_rendertree & tree) {
-
-	}
-
-	uint8_t build_rendertree_item(elix_html_document * doc, elix_html_node &node, elix_rendertree_item * parent) {
-		node_object * obj = node.get();
-		if (obj->type) {
-			switch (obj->type) {
-				case ELEMENT_RAWTEXT:
-					obj->render_item.render_style.backgroundColour.hex = 0x000000FF;
-					obj->render_item.data = &obj->textContent;
-					obj->render_item.data_type = ERTD_STRING;
-					obj->render_item.render_style.display = ERT_INLINEBLOCK;
-					printf("ELEMENT_RAWTEXT\n");
-					break;
-				case ELEMENT_NORMAL:
-					obj->render_item.data_type = ERTD_EMPTY;
-					obj->render_item.render_style.display = ERT_BLOCK;
-					if ( parent ) {
-						obj->render_item.render_style.backgroundColour.hex = 0xFFFFFFFF;
-						obj->render_item.render_style.width = parent->render_style.width;
-					} else  {
-						obj->render_item.render_style.backgroundColour.hex = 0xFF0000FF;
-						obj->render_item.render_style.width = doc->rendertree.width;
-						obj->render_item.render_style.height = doc->rendertree.height;
-					}
-					printf("ELEMENT_NORMAL\n");
-					break;
-				default:
-					obj->render_item.data_type = ERTD_EMPTY;
-					break;
-			}
-
-			obj->render_item.children.clear();
-
-			for (elix_html_node q: obj->children) {
-				elix_html_node_object * q_obj = q.get();
-				build_rendertree_item(doc, q, &obj->render_item);
-				obj->render_item.children.push_back(&q.get()->render_item);
-			}
-
-			return 0;
-		}
-
-		return 1;
-	}
-
-
-
-
-
-
-
-	void clear_rendertree_item(elix_rendertree_item *& item) {
-		for (elix_rendertree_item * q: item->children) {
-			clear_rendertree_item(q);
-		}
-		item->children.clear();
-		delete item;
-
-	}
-
-
-	void clear_render_tree(elix_html_document * doc) {
-		if (doc->root.get()->type) {
-			clear_rendertree_item(doc->rendertree.root);
-		} else {
-			printf("No Root Node found\n");
-		}
-
-
-	}
-
-	elix_rendertree build_render_tree(elix_html_document * doc, elix_uv32_2 dimension) {
-
-		if (doc->root.get()->type) {
-			doc->rendertree.width = dimension.width;
-			doc->rendertree.height = dimension.height;
-			build_rendertree_item(doc, doc->root, nullptr);
-		} else {
-			printf("No Root Node found\n");
-		}
-
-		return doc->rendertree;
-	}
-
-*/
 

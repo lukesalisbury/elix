@@ -121,7 +121,7 @@ typedef struct rbgabuffer_context {
 	uint8_t internal_buffer; //Note: Owned by this
 	elix_uv32_2 dimensions;
 
-
+	rgbabuffer_font * loaded_font;
 	rgbabuffer_font * emoji;
 	rbgabuffer_command_array commands;
 

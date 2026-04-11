@@ -1,5 +1,6 @@
 #include "elix_endian.h"
 #include "elix_html.h"
+#include "elix_html_rendertree.h"
 #include "extra/elix_fpscounter.hpp"
 #include "window/elix_os_window.hpp"
 
@@ -8,14 +9,50 @@
 #include "elix_cstring.h"
 #include "elix_os.h"
 #include "elix_file.h"
+#include "elix_hashmap.h"
+
+#define LOG_INDENT(M, ...) printf("\t" M "\n", ##__VA_ARGS__)
+#define LOG_TEXT(M, ...) printf(M "\n", ##__VA_ARGS__)
+#define LOG_HR() printf("--------------------------------------------------------" "\n")
+
 
 static elix_fpscounter fps;
 static elix_program_info program_info;
 static elix_consent program_consent = {true, true, nullptr};
 
-
-//uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
-
+function_results print_rgbabuffer(rbgabuffer_context * ctx) {
+	printf("   0%*c%d\n", ctx->memory->width-2, ' ', ctx->memory->width  );
+	uint32_t colour;
+	for (uint32_t y = 0; y < ctx->memory->height; ++y) {
+		printf("%02d:", y);
+		for (uint32_t x = 0; x < ctx->memory->width; ++x) {
+			//TODO Redo this
+			colour = rbgabuffer_get_pixel(ctx, x, y);
+			switch (colour) {
+				case 0xDEADC0DE:
+					printf("~");
+				break;
+				case 0xFFEEEEEE:
+					printf("#");
+				break;
+				case 0xFFAAAAAA:
+					printf("$");
+				break;
+			case 0xFFFFf000:
+				printf("*");
+			break;
+			case 0xFFFF00FF:
+				printf("+");
+			break;
+				default:
+					printf("_");
+				break;
+			}
+		}
+		printf("\n");
+	}
+	return RESULTS_UNKNOWN;
+}	
 
 void update_buffer_randomly(elix_graphic_data * buffer) {
 	uint32_t * p = buffer->pixels;
@@ -45,32 +82,29 @@ bool elix_cstring_equal(const char * A, const char * B) {
 }
 
 
-void test_elix_endian() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOG_MESSAGE("--- Elix Endian ----------------------------------------");
-
+function_results test_elix_endian() {
 	uint32_t ul = 0x12030456;
 	uint32_t uln = elix_endian_network32(ul);
 	uint32_t ulh = elix_endian_host32(uln);
-	LOG_MESSAGE("elix::endian:native 0x%08x\n", ul);
-	LOG_MESSAGE("elix::endian:net32  0x%08x\n", uln);
-	LOG_MESSAGE("elix::endian:host32 0x%08x\n", ulh);
+	LOG_INDENT("elix::endian:native 0x%08x", ul);
+	LOG_INDENT("elix::endian:net32  0x%08x", uln);
+	LOG_INDENT("elix::endian:host32 0x%08x", ulh);
 
 
 	uint16_t us = 0x1203;
 	uint16_t usn = elix_endian_network16(us);
 	uint16_t ush = elix_endian_host16(usn);
-	LOG_MESSAGE("elix::endian:native 0x%04x\n", us);
-	LOG_MESSAGE("elix::endian:net16  0x%04x\n", usn);
-	LOG_MESSAGE("elix::endian:host16 0x%04x\n", ush);
-
-	LOG_MESSAGE("--------------------------------------------------------");
+	LOG_INDENT("elix::endian:native 0x%04x", us);
+	LOG_INDENT("elix::endian:net16  0x%04x", usn);
+	LOG_INDENT("elix::endian:host16 0x%04x", ush);
+	return RESULTS_UNKNOWN;
 }
 
+
 /*
-void test_elix_rendertree() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOG_MESSAGE("--- Elix Rendertree ------------------------------------");
+function_results test_elix_rendertree() {
+
+	LOG_INDENT("--- Elix Rendertree ------------------------------------");
 
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
@@ -91,7 +125,7 @@ void test_elix_rendertree() {
 
 	elix_os_window_destroy( w );
 	delete w;
-
+	return RESULTS_UNKNOWN;
 }
 */
 elix_string_buffer elix_string_buffer_new(const char * string, size_t length) {
@@ -111,25 +145,35 @@ elix_string_buffer elix_string_buffer_new(const char * string, size_t length) {
 
 const char * test_elix_html_string = R"TEXT(<!DOCTYPE html><html>
 	<!-- Commement --><body>Hello <![CDATA[ sdaghkl
- asd]] ]]> 🐨 World 🐱‍🚀<div class="asdd" fail="this"><div tag>test</div>🐨</div></body></html>)TEXT";
+ asd]] ]]> 🐨 World 🐱‍🚀<div class="asdd" fail="this"><div tag>test</div>🐨🐨</div></body></html>)TEXT";
 
-void test_elix_html() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOG_MESSAGE("--- Elix HTML Parser -----------------------------------");
-
+function_results test_elix_html() {
 	elix_string_buffer test_html = elix_string_buffer_new(test_elix_html_string, 512);
+	LOG_INDENT("Source", "");
+	LOG_INDENT("%*s", test_html.length, test_html.data);
 
-	LOG_MESSAGE("%*s", test_html.length, test_html.data);
-	LOG_MESSAGE("--------------------------------------------------------");
 	elix_html_document * html = elix_html_open(&test_html);
+
+	LOG_INDENT("Parsed", "");
 	elix_html_print(html);
 
-/*
+	elix_html_close(html);
+
+	return RESULTS_UNKNOWN;
+}
+
+function_results test_elix_html_window() {
+	elix_string_buffer test_html = elix_string_buffer_new(test_elix_html_string, 512);
+
+	elix_html_document * html = elix_html_open(&test_html);
+
+
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
-	//elix_rendertree tree = elix::html::build_render_tree(&html, bitmap_context->dimensions);
-	//elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
+	elix_rendertree tree = elix_html_build_rendertree(html, bitmap_context->dimensions);
+	elix_rendertree_to_rgbabuffer(&tree, bitmap_context, 1);
+
 	while(elix_os_window_handle_events(w) ) {
 		if ( w->flags & EOE_WIN_CLOSE ) {
 			elix_os_window_destroy(w);
@@ -143,13 +187,13 @@ void test_elix_html() {
 
 	elix_os_window_destroy( w );
 	delete w;
-*/
+	
+	elix_html_close(html);
+
+	return RESULTS_UNKNOWN;
 }
 
-void test_elix_os_window() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOG_MESSAGE("--- Elix OS Window -------------------------------------");
-
+function_results test_elix_os_window() {
 	elix_os_window * w = elix_os_window_create({{600, 400}}, {4,4});
 
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context( w->display_buffer, w->dimension );
@@ -160,7 +204,6 @@ void test_elix_os_window() {
 	rbgabuffer_Rect(bitmap_context, 80, 80, 120,30);
 	rbgabuffer_FillColor(bitmap_context, 0xFFFF00FF);
 	rbgabuffer_Fill(bitmap_context);
-
 
 	rbgabuffer_BeginPath(bitmap_context);
 	rbgabuffer_MoveTo(bitmap_context, 20.0, 0.0);
@@ -187,18 +230,19 @@ void test_elix_os_window() {
 
 	elix_os_window_destroy( w );
 	delete w;
+	return RESULTS_UNKNOWN;
 }
 
-void test_elix_rgbabuffer() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOG_MESSAGE("--- Elix RGBA Buffer -----------------------------------");
+
+
+
+function_results test_elix_rgbabuffer() {
 	rbgabuffer_context * bitmap_context = rbgabuffer_create_context(nullptr, {{40,20}} );
 
 	rbgabuffer_BeginPath(bitmap_context);
 	rbgabuffer_Rect(bitmap_context, 8, 8, 12,3);
 	rbgabuffer_FillColor(bitmap_context, 0xFFFF00FF);
 	rbgabuffer_Fill(bitmap_context);
-
 
 	rbgabuffer_BeginPath(bitmap_context);
 	rbgabuffer_MoveTo(bitmap_context, 4.0, 0.0);
@@ -209,62 +253,32 @@ void test_elix_rgbabuffer() {
 	rbgabuffer_FillColor(bitmap_context, 0xFFFFf000);
 	rbgabuffer_Fill(bitmap_context);
 
-	printf("   0%*c%d\n", bitmap_context->memory->width-2, ' ', bitmap_context->memory->width  );
-	uint32_t colour;
-	for (uint32_t y = 0; y < bitmap_context->memory->height; ++y) {
-		printf("%02d:", y);
-		for (uint32_t x = 0; x < bitmap_context->memory->width; ++x) {
-			//TODO Redo this
-			colour = rbgabuffer_get_pixel(bitmap_context, x, y);
-			switch (colour) {
-				case 0xDEADC0DE:
-					printf("~");
-				break;
-				case 0xFFEEEEEE:
-					printf("#");
-				break;
-				case 0xFFAAAAAA:
-					printf("$");
-				break;
-			case 0xFFFFf000:
-				printf("*");
-			break;
-			case 0xFFFF00FF:
-				printf("+");
-			break;
-				default:
-					printf("_");
-				break;
-			}
-		}
-		printf("\n");
-	}
+	print_rgbabuffer(bitmap_context);
 
+	return RESULTS_UNKNOWN;
 }
 
 
-void test_elix_cstring() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOGF_MESSAGE("--- Elix C-String --------------------------------------");
+function_results test_elix_cstring() {
 	char testA[] = ".asdfhg8dhfjk459fg9!@#$%^&*( kxfgf-78546fdsgl;'][.";
 	char testB[] = "1234567890ABCDEFGH"; //18
 //	char messageB[2][8] = {"Failed", "Success"};
 
 	const char sanitisedTestA[] = "asdfhg8dhfjk459fg9kxfgf-78546fdsgl][.";
 
-	LOG_MESSAGE("Sanitise");
-	LOG_MESSAGE("Before: %s length:" pZU "", testA, elix_cstring_length_stupid_c(testA));
+	LOG_INDENT("Sanitise");
+	LOG_INDENT("Before: %s length:" pZU "", testA, elix_cstring_length_stupid_c(testA));
 	elix_cstring_sanitise(testA);
-	LOG_MESSAGE(" After: %s length:" pZU "", testA, elix_cstring_length_stupid_c(testA));
+	LOG_INDENT(" After: %s length:" pZU "", testA, elix_cstring_length_stupid_c(testA));
 
 	if ( !elix_cstring_equal(testA,sanitisedTestA) ) {
-		LOG_MESSAGE("String is not sanitised.");
+		LOG_INDENT("String is not sanitised.");
 	}
 
-	LOG_MESSAGE("has_suffix(\"adsadsadas\", \"das\"): %d", elix_cstring_has_suffix("adsadsadas", "das"));
-	LOG_MESSAGE("has_suffix(\"adsadsadas\", \"qdas\"): %d", elix_cstring_has_suffix("adsadsadas", "qdas"));
+	LOG_INDENT("has_suffix(\"adsadsadas\", \"das\"): %d", elix_cstring_has_suffix("adsadsadas", "das"));
+	LOG_INDENT("has_suffix(\"adsadsadas\", \"qdas\"): %d", elix_cstring_has_suffix("adsadsadas", "qdas"));
 
-	LOG_MESSAGE("elix_cstring_find_of(\"asdfhg8dhfjk459fg9kxfgf\", \"dhf\"): %d", elix_cstring_find_of("asdfhg8dhfjk459fg9kxfgf", "dhf", 0));
+	LOG_INDENT("elix_cstring_find_of(\"asdfhg8dhfjk459fg9kxfgf\", \"dhf\"): %d", elix_cstring_find_of("asdfhg8dhfjk459fg9kxfgf", "dhf", 0));
 
 
 	char * leftsub = nullptr, * leftnegsub = nullptr,* midsub = nullptr, * midnegsub = nullptr, * rightsub = nullptr, * rightnegsub = nullptr;
@@ -277,94 +291,150 @@ void test_elix_cstring() {
 	rightnegsub = elix_cstring_substr(testB, 0, -10);
 
 
-	LOG_MESSAGE("String Used: %s", testB); // 18
-	LOG_MESSAGE("Left Substr: %s [" pZU ":%d] from " pZD, leftsub, elix_cstring_length_stupid_c(leftsub), 13, 5);
-	LOG_MESSAGE("Left with negSubstr: %s [" pZU ":%d] from " pZD, leftnegsub,elix_cstring_length_stupid_c(leftnegsub), 5,  -5);
-	LOG_MESSAGE("Mid Substr: %s [" pZU ":%d] from %d with length " pZD, midsub, elix_cstring_length_stupid_c(midsub),5,  2, 5);
-	LOG_MESSAGE("Mid with neg Substr: %s [" pZU ":%d] from %d with length " pZD, midnegsub, elix_cstring_length_stupid_c(midnegsub),14, 2, -2);
-	LOG_MESSAGE("Right Substr: %s [" pZU ":%d] from %d with length " pZD, rightsub, elix_cstring_length_stupid_c(rightsub),10, 0, 10);
-	LOG_MESSAGE("right with neg Substr: %s [" pZU ":%d] from %d with length " pZD, rightnegsub,  elix_cstring_length_stupid_c(rightnegsub),8, 0, -10);
+	LOG_INDENT("String Used: %s", testB); // 18
+	LOG_INDENT("Left Substr: %s [" pZU ":%d] from " pZD, leftsub, elix_cstring_length_stupid_c(leftsub), 13, 5);
+	LOG_INDENT("Left with negSubstr: %s [" pZU ":%d] from " pZD, leftnegsub,elix_cstring_length_stupid_c(leftnegsub), 5,  -5);
+	LOG_INDENT("Mid Substr: %s [" pZU ":%d] from %d with length " pZD, midsub, elix_cstring_length_stupid_c(midsub),5,  2, 5);
+	LOG_INDENT("Mid with neg Substr: %s [" pZU ":%d] from %d with length " pZD, midnegsub, elix_cstring_length_stupid_c(midnegsub),14, 2, -2);
+	LOG_INDENT("Right Substr: %s [" pZU ":%d] from %d with length " pZD, rightsub, elix_cstring_length_stupid_c(rightsub),10, 0, 10);
+	LOG_INDENT("right with neg Substr: %s [" pZU ":%d] from %d with length " pZD, rightnegsub,  elix_cstring_length_stupid_c(rightnegsub),8, 0, -10);
+
+	return RESULTS_UNKNOWN;
 }
 
-void test_elix_program() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOGF_MESSAGE("--- Elix Program ---------------------------------------");
-	LOG_MESSAGE("User: %s", program_info.user);
-	LOG_MESSAGE("Name: %s", program_info.program_name);
-	LOG_MESSAGE("Version: %s", program_info.program_version);
-	LOG_MESSAGE("Level: %s", program_info.program_version_level);
-	LOG_MESSAGE("Pre-set directory: %s", program_info.program_directory);
-	LOG_MESSAGE("Binary: %s in %s", program_info.path_executable.filename, program_info.path_executable.path);
-
-
-	LOG_MESSAGE("Document Directory (Public): %s", elix_program_directory_documents(&program_info, true, nullptr));
-	LOG_MESSAGE("Document Directory (User): %s", elix_program_directory_documents(&program_info, false, nullptr));
-	LOG_MESSAGE("Document File (Public): %s", elix_program_directory_documents(&program_info, true, "file333.txt"));
-	LOG_MESSAGE("Document File (User): %s", elix_program_directory_documents(&program_info, false, "file222.txt"));
-	LOG_MESSAGE("User Directory (Roaming): %s", elix_program_directory_user(&program_info, true, nullptr));
-	LOG_MESSAGE("User Directory: %s", elix_program_directory_user(&program_info, false, nullptr));
-	LOG_MESSAGE("User File (Roaming): %s", elix_program_directory_user(&program_info, true, "file444.txt"));
-	LOG_MESSAGE("User File: %s", elix_program_directory_user(&program_info, false, "file555.txt"));
-
-	LOG_MESSAGE("Resource Directory: %s", elix_program_directory_resources(&program_info, nullptr, EPRD_AUTO));
-	LOG_MESSAGE("Resource File: %s", elix_program_directory_resources(&program_info, "file666.txt", EPRD_AUTO));
-
-	LOG_MESSAGE("Cache File: %s", elix_program_directory_cache_file(&program_info, "file778.txt"));
-
+inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
+	uint8_t * a = (uint8_t *)p1, * b = (uint8_t *)p2;
+	for (size_t i = 0; i < size; ++i) {
+		if ( a[i] != b[i] ) {
+			return 0;
+		}
+	}
+	return 1;
 }
 
-void test_elix_os_directory() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOGF_MESSAGE("--- Elix Directory -------------------------------------");
+function_results test_elix_program() {
+	struct program_test {
+		char * (*func)(const elix_program_info * program_info, bool shared, const char * filename );
+		char title[128];
+		bool shared;
+		char * filename;
+		char expected[768];
+	};
+
+	size_t error_count = 0;
+	char * buffer = nullptr;
+	char test_filename[] = "file444.txt";
+
+	program_test test[] = {
+		{&elix_program_directory_documents, "Document Directory (Public)", true, nullptr, "/usr/share/ElixTestProgram/ElixTestProgram" },
+		{&elix_program_directory_documents, "Document Directory (User)", false, nullptr, "" },
+		{&elix_program_directory_documents, "Document File (Public)",  true, test_filename, "/usr/share/ElixTestProgram/ElixTestProgram/file444.txt" },
+		{&elix_program_directory_documents, "Document File (User)", false, test_filename, "" },
+
+		{&elix_program_directory_documents, "User Directory (Roaming)", true, nullptr },
+		{&elix_program_directory_documents, "User Directory", false, nullptr },
+		{&elix_program_directory_documents, "User File (Roaming)",  true, test_filename },
+		{&elix_program_directory_documents, "User File", false, test_filename },
+	};
+
+	LOG_INDENT("User Name: %s", program_info.user);
+	LOG_INDENT("Program Name: %s", program_info.program_name);
+	LOG_INDENT("Version: %s", program_info.program_version);
+	LOG_INDENT("Level: %s", program_info.program_version_level);
+	LOG_INDENT("Pre-set directory: %s", program_info.program_directory);
+	LOG_INDENT("Binary: %s in %s", program_info.path_executable.filename, program_info.path_executable.path);
+	LOG_INDENT("");
+
+	for (auto &&i : test) {
+		buffer = i.func(&program_info, i.shared, i.filename);
+		error_count += !(buffer);
+		LOG_INDENT("%s %s: %s - Expected: %s", elix_compare(buffer, i.expected, 768) ? "✅" : "❌", i.title, buffer, i.expected);
+		NULLIFY(buffer);
+	}
+
+	buffer = elix_program_directory_resources(&program_info, nullptr, EPRD_DATA);
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Resource Directory (EPRD_DATA)", buffer);
+	NULLIFY(buffer);
+
+	buffer = elix_program_directory_resources(&program_info, nullptr, EPRD_PARENT_SHARE);
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Resource Directory (EPRD_PARENT_SHARE)", buffer);
+	NULLIFY(buffer);
+	
+	buffer = elix_program_directory_resources(&program_info, nullptr, EPRD_SHARE);
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Resource Directory (EPRD_SHARE)", buffer);
+	NULLIFY(buffer);
+
+	buffer = elix_program_directory_resources(&program_info, nullptr, EPRD_GLOBAL);
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Resource Directory (EPRD_GLOBAL)", buffer);
+	NULLIFY(buffer);
+
+	buffer = elix_program_directory_resources(&program_info, nullptr, EPRD_AUTO);
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Resource Directory (EPRD_AUTO)", buffer);
+	NULLIFY(buffer);
+
+	buffer = elix_program_directory_resources(&program_info, "file666.txt", EPRD_AUTO);
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Resource File", buffer);
+	NULLIFY(buffer);
+	
+	buffer = elix_program_directory_cache_file(&program_info, "file666.txt");
+	error_count += !(buffer);
+	LOG_INDENT("%s: %s", "Cache File", buffer);
+	NULLIFY(buffer);
+
+	return error_count ? RESULTS_ERROR : RESULTS_SUCCESS;
+}
+
+function_results test_elix_os_directory() {
 	char * dir = elix_program_directory_resources(&program_info, nullptr, EPRD_AUTO);
 	char * subdir = elix_program_directory_resources(&program_info, "TestDir", EPRD_AUTO);
-	LOG_MESSAGE("'%s' is dir? %d", dir, elix_os_directory_is(dir, &program_consent));
-	LOG_MESSAGE("'%s' is dir? %d", "C:/Users/", elix_os_directory_is("C:/Users/", &program_consent));
-	LOG_MESSAGE("'%s' is dir? %d", "/usr/", elix_os_directory_is("/usr/", &program_consent));
 
-	LOG_MESSAGE("elix_os_directory_make(subdir):  %d", elix_os_directory_make_stupid_c(subdir));
-	LOG_MESSAGE("elix_os_directory_is(subdir):  %d", elix_os_directory_is(subdir, &program_consent));
-	LOG_MESSAGE("elix_os_directory_remove(subdir):  %d", elix_os_directory_remove(subdir, false, &program_consent));
-	LOG_MESSAGE("elix_os_directory_is(subdir):  %d", elix_os_directory_is(subdir, &program_consent));
+	LOG_INDENT("'%s' is dir? %d", dir, elix_os_directory_is(dir, &program_consent));
+	LOG_INDENT("'%s' is dir? %d", "C:/Users/", elix_os_directory_is("C:/Users/", &program_consent));
+	LOG_INDENT("'%s' is dir? %d", "/usr/", elix_os_directory_is("/usr/", &program_consent));
+
+	LOG_INDENT("elix_os_directory_make(subdir):  %d", elix_os_directory_make_stupid_c(subdir));
+	LOG_INDENT("elix_os_directory_is(subdir):  %d", elix_os_directory_is(subdir, &program_consent));
+	LOG_INDENT("elix_os_directory_remove(subdir):  %d", elix_os_directory_remove(subdir, false, &program_consent));
+	LOG_INDENT("elix_os_directory_is(subdir):  %d", elix_os_directory_is(subdir, &program_consent));
 
 	const char * directory_pth= ".";
 	elix_directory * directory = elix_os_directory_list_create(directory_pth, nullptr, &program_consent);
 	if ( directory ) {
 		for (size_t b = 0; b < directory->count; ++b) {
 			if ( elix_os_directory_is(directory->files[b].uri, nullptr) ) {
-				LOG_MESSAGE("D: %s %s '%s'", directory->files[b].path, directory->files[b].filename, directory->files[b].uri);
+				LOG_INDENT("D: %s %s '%s'", directory->files[b].path, directory->files[b].filename, directory->files[b].uri);
 			} else {
-				LOG_MESSAGE("F: %s %s %s '%s'", directory->files[b].path, directory->files[b].filename, directory->files[b].filetype, directory->files[b].uri);
+				LOG_INDENT("F: %s %s %s '%s'", directory->files[b].path, directory->files[b].filename, directory->files[b].filetype, directory->files[b].uri);
 			}
 		}
 		elix_os_directory_list_destroy(&directory);
 	}
 
-
-
 	delete dir;
 	delete subdir;
 
+	return RESULTS_UNKNOWN;
 }
 
 #include "extra/elix_package.h"
 
-void test_elix_package() {
-
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOGF_MESSAGE("--- Elix Packages --------------------------------------");
-
+function_results test_elix_package() {
 	size_t before,  after;
 
 	before = elix_os_memory_usage();
-
 
 	elix_package * puttris = elix_package_create("bin/puttytris.game", EP_GAME_OLD);
 	elix_package_info(puttris);
 
 	elix_package_data data = elix_package_get_file(puttris, "./game.mokoi");
 
-	LOG_MESSAGE("Content of ./game.mokoi");
+	LOG_INDENT("Content of ./game.mokoi");
 	for (uint32_t y = 0; y < data.size; ++y) {
 		printf("%c", data.data[y]);
 	}
@@ -372,7 +442,7 @@ void test_elix_package() {
 
 	elix_package_data data2 = elix_package_get_file(puttris, "./c/scripts/main.amx");
 
-	LOG_MESSAGE("Content of main.amx");
+	LOG_INDENT("Content of main.amx");
 	for (uint32_t y = 0; y < data2.size; ++y) {
 		if( y % 64 ==0 && y )
 			printf("\n");
@@ -385,10 +455,9 @@ void test_elix_package() {
 	delete puttris;
 
 	after = elix_os_memory_usage();
-	LOG_MESSAGE("Memory Usage: Before: " pZU ", After: " pZU ", Diff: " pZU, before, after, after - before);
+	LOG_INDENT("Memory Usage: Before: " pZU ", After: " pZU ", Diff: " pZU, before, after, after - before);
+	return RESULTS_UNKNOWN;
 }
-
-
 
 const char * test_string_list[] = {
 "SaddleLeg4020",
@@ -461,10 +530,8 @@ const char * test_string_list[] = {
 "Compact DiscDress4703",
 };
 
-#include "elix_hashmap.h"
-void test_elix_hash() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOGF_MESSAGE("--- Elix Hash ------------------------------------------");
+
+function_results test_elix_hash() {
 	uint8_t tests_failed = 0;
 	elix_hashmap * hm = elix_hashmap_create();
 
@@ -475,7 +542,7 @@ void test_elix_hash() {
 	for (uint16_t c = 0; c < 68; c++) {
 		char * hashs = (char*)elix_hashmap_value(hm, test_string_list[c]);
 		if ( !elix_cstring_equal(hashs, test_string_list[c]) ){
-			LOG_MESSAGE("index %d doesn't match, it should be '%s' got '%s'", c, test_string_list[c], hashs);
+			LOG_INDENT("index %d doesn't match, it should be '%s' got '%s'", c, test_string_list[c], hashs);
 			tests_failed++;
 		}
 	}
@@ -483,71 +550,86 @@ void test_elix_hash() {
 	elix_hashmap_remove(hm, "VampireAeroplane7563", nullptr);
 
 	if ( elix_hashmap_value(hm, test_string_list[59]) != nullptr) {
-		LOG_MESSAGE("VampireAeroplane7563 hasn't been removed");
+		LOG_INDENT("VampireAeroplane7563 hasn't been removed");
 		tests_failed++;
 	}
 
 	elix_hashmap_destroy(&hm, nullptr);
-	LOGF_MESSAGE("--- Errors: %u ------------------------------------------", tests_failed);
+	LOG_INDENT("--- Errors: %u ------------------------------------------", tests_failed);
+	return RESULTS_UNKNOWN;
 }
 
-
-
-void test_directory_watch() {
-	LOG_MESSAGE("--------------------------------------------------------");
-	LOGF_MESSAGE("--- Elix File Watcher -----------------------------");
-
+function_results test_directory_watch() {
 	int64_t timestamp = 0;
 	uint8_t results = elix_file_modified_check("bin/a.txt", &timestamp);
-	LOG_MESSAGE("%d: %s", results, ctime(&timestamp));
+
+	LOG_INDENT("%d: %s", results, ctime(&timestamp));
 	while ( results > 0 ) {
 		results = elix_file_modified_check("bin/a.txt", &timestamp);
 		if ( results == 2 ) {
-			LOG_MESSAGE("%d: %s", results, ctime(&timestamp));
+			LOG_INDENT("%d: %s", results, ctime(&timestamp));
 		}
 		elix_os_system_idle(1000);
 	}
-	LOGF_MESSAGE("--------------------------------------------------------");
+	return RESULTS_UNKNOWN;
 }
 
+function_results test_console() {
+	LOG_INDENT("Console Test: %s\n", "🎒🤔🐱‍🚀" );
+	return RESULTS_UNKNOWN;
+}
 
-void test_run( const char* name, void (*test)() ) {
-	if ( test ) {
+typedef struct test_method {
+	char name[64];
+	function_results (*func)();
+	function_results result;
+	double time;
+} test_method;
+
+static test_method tests[] = {
+	//{"Console", &test_console, RESULTS_PENDING, 0.0},
+	{"Program Info", &test_elix_program, RESULTS_PENDING, 0.0},
+	//{"Directories", &test_elix_os_directory, RESULTS_PENDING, 0.0},
+	{"Endian", &test_elix_endian, RESULTS_PENDING, 0.0},
+	{"HTML Parsing", &test_elix_html, RESULTS_PENDING, 0.0},
+	{"HTML Rendering", &test_elix_html_window, RESULTS_PENDING, 0.0},
+	
+	{"RGBABuffer", &test_elix_rgbabuffer, RESULTS_PENDING, 0.0},
+
+	{"Hash table", &test_elix_hash, RESULTS_PENDING, 0.0},
+	{"Window/Canvas", &test_elix_os_window, RESULTS_PENDING, 0.0},
+	//{"Directory Watcher", &test_directory_watch, RESULTS_PENDING, 0.0},
+	{"C Strings", &test_elix_cstring, RESULTS_PENDING, 0.0},
+
+	//{"Packages", &test_elix_package, RESULTS_PENDING, 0.0},
+};
+
+
+void test_run_method( test_method & method ) {
+	if ( method.func ) {
+		LOG_TEXT("--- %s -----------------------------", method.name);
 		struct timespec start, end;
-		//clock_gettime(CLOCK_MONOTONIC, &start );
-		test();
-		//clock_gettime(CLOCK_MONOTONIC, &end );
-
-		//double elapse = difftime(end.tv_sec, start.tv_sec) + ((double)(end.tv_nsec - start.tv_nsec)/1.0e9);
-		//NAMEDLOG_MESSAGE(name, "--- Took: %f ------------------------------------------", elapse);
+		clock_gettime(CLOCK_MONOTONIC, &start );
+		method.result = method.func();
+		clock_gettime(CLOCK_MONOTONIC, &end );
+		method.time = difftime(end.tv_sec, start.tv_sec) + ((double)(end.tv_nsec - start.tv_nsec)/1.0e9);
+	} else {
+		method.result = RESULTS_FUNCTION_UNIMPLEMENTED;
 	}
 }
 
-
-
-int main(int UNUSEDARG argc, char UNUSEDARG * argv[])
-{
-	//SetConsoleOutputCP(65001);
-
-	printf("Console Test: %s\n", "🎒🤔🐱‍🚀" );
-
+int main(int UNUSEDARG argc, char UNUSEDARG * argv[]) {
 	program_info = elix_program_info_create(argv[0], "Elix Test Program", "0.4", nullptr);
-	test_run("Program Info", &test_elix_program);
-	//test_run("Endian", &test_elix_endian);
-	//test_run("Rendertree", &test_elix_html);
-	//test_run("Hash table", &test_elix_hash);
 
-	//test_run("CANVAS", &test_elix_os_window);
+	for (auto &&i : tests) {
+		test_run_method(i);
+	}
+	
+	LOG_HR();
 
-	//test_run("Directory Watcher", &test_directory_watch);
-	//test_elix_rgbabuffer();
-
-	//test_elix_cstring();
-
-	//
-	test_run("Directory", &test_elix_os_directory);
-	//test_elix_os_directory();
-	//test_elix_package();
+	for (auto &&i : tests) {
+		LOG_TEXT("[%s] 0x%x - Time: %f", i.name, i.result, i.time );
+	}
 
 	return 0;
 }

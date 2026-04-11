@@ -45,11 +45,12 @@ elix_v64_2 elix_font_text_measure(const char * text, size_t text_length, elix_fo
 	int baseline = (int) (ascent * font_scale);
 	int descent_scaled = (int) (descent * font_scale);
 
-	char * object = (char*)text;
+	char * object, * next_object = (char*)text;
 	uint32_t current_character = 0, next_character = 0;
 	size_t count = 0;
-	while ( (current_character = elix_cstring_next_character(object)) > 0 && count <text_length ) {
-		next_character = elix_cstring_peek_character(object);
+	while ( (current_character = elix_cstring_next_character(object, &next_object)) > 0 && count <text_length ) {
+		next_character = elix_cstring_peek_character(next_object);
+		object = next_object;
 		count++;
 
 

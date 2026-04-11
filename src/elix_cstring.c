@@ -143,7 +143,7 @@ bool elix_cstring_has_prefix( const char * str, const char * prefix) {
 	return true;
 }
 
-uint8_t elix_cstring_append( char * str, const size_t len, const char * text, const size_t text_len) {
+size_t elix_cstring_append( char * str, const size_t len, const char * text, const size_t text_len) {
 	size_t length = elix_cstring_length(str, 0);
 	// TODO: Switch to memcpy
 	for (size_t c = 0;length < len && c < text_len; length++, c++) {
@@ -317,7 +317,7 @@ char * elix_cstring_from( const char * source, const char * default_str, size_t 
 }
 
 
-uint32_t elix_cstring_next_character(char * object) {
+uint32_t elix_cstring_next_character(char * object, char ** next) {
 	uint8_t single = *object;
 	uint32_t cchar = single;
 	if ( cchar <= 128 )	{
@@ -352,13 +352,15 @@ uint32_t elix_cstring_next_character(char * object) {
 		next = (*object) & 0x3f;
 		cchar += next;
 	}
-	object++;
+	*object++;
+
+	if ( next )
+		*next = object;
 	return cchar;
 }
 
 uint32_t elix_cstring_peek_character(char * object) {
-	char * object_peek = object;
-	return elix_cstring_next_character(object_peek);
+	return elix_cstring_next_character(object, nullptr);
 }
 
 
