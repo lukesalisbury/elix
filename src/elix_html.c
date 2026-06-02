@@ -118,7 +118,7 @@ void elix_html_attrlist_push(elix_html_attrlist * nl, elix_html_attr node) {
 	elix_html_attrlist_push(nl->next, node);
 }
 
-elix_html_attr elix_html_attrlist_get(elix_html_attrlist * nl, uint16_t index) {
+elix_html_attr elix_html_attrlist_get(elix_html_attrlist * nl, elix_parse_listsize index) {
 	if (!nl || !nl->active.used) {
 		LOG_ERROR("Invalid elix_html_attrlist");
 		return nullptr;
@@ -146,7 +146,7 @@ elix_html_attr elix_html_attrlist_get_last(elix_html_attrlist * nl) {
 	return nullptr;
 }
 
-elix_html_node elix_html_nodelist_get(elix_html_nodelist * nl, uint16_t index) {
+elix_html_node elix_html_nodelist_get(elix_html_nodelist * nl, elix_parse_listsize index) {
 	if (!nl || !nl->active.used) {
 		LOG_ERROR("Invalid elix_html_nodelist");
 		return nullptr;
@@ -185,6 +185,7 @@ elix_html_node elix_html_node_push(elix_html_node current_node, uint8_t type, el
 		next_node->parent = current_node;
 		elix_html_nodelist_push( &doc->all_nodes, next_node);
 		elix_html_nodelist_push( &current_node->children, next_node);
+		current_node->childrenCount++;
 	}
 	return next_node;
 }
@@ -495,7 +496,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 							elix_html_attr new_attribute = ALLOCATE(elix_html_attr_object, 1);
 							new_attribute->name = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length, buffer.length);
 							elix_html_attrlist_push(&current_node->attribute, new_attribute);
-
+							current_node->attributeCount++;
 							if ( debug )
 								printf("[>] name:'%.*s'\n", new_attribute->name.length, new_attribute->name.string);
 							elix_string_clear(&buffer);
@@ -510,6 +511,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 							elix_html_attr new_attribute = ALLOCATE(elix_html_attr_object, 1);
 							new_attribute->name = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length, buffer.length);
 							elix_html_attrlist_push(&current_node->attribute, new_attribute);
+							current_node->attributeCount++;
 
 							if ( debug )
 								printf("[ ] name:'%.*s'\n", new_attribute->name.length, new_attribute->name.string);
@@ -519,7 +521,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 						elix_html_attr new_attribute = ALLOCATE(elix_html_attr_object, 1);
 						new_attribute->name = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length, buffer.length);
 						elix_html_attrlist_push(&current_node->attribute, new_attribute);
-
+						current_node->attributeCount++;
 						if ( debug )
 							printf("[=] name:'%.*s' %s\n", new_attribute->name.length, new_attribute->name.string, buffer.text);
 						elix_string_clear(&buffer);

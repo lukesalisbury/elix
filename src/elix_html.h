@@ -61,13 +61,11 @@ typedef struct elix_html_node_object* elix_html_node;
 struct elix_html_attr_object;
 typedef struct elix_html_attr_object* elix_html_attr;
 
-
 typedef struct elix_html_document {
 	elix_html_nodelist all_nodes;
 	elix_string_buffer * reference;
 	elix_html_node root;
 } elix_html_document;
-
 
 typedef struct elix_html_attr_object {
 	elix_string_pointer name;
@@ -82,6 +80,8 @@ typedef struct elix_html_node_object {
 	elix_html_node parent;
 	elix_html_nodelist children;
 	elix_html_attrlist attribute;
+	elix_parse_listsize childrenCount;
+	elix_parse_listsize attributeCount;
 	
 } elix_html_node_object;
 
@@ -95,6 +95,9 @@ void elix_html_print(elix_html_document * doc);
 void elix_html_close(elix_html_document * doc);
 
 elix_html_node elix_html_get_node_by_tag(elix_html_node parent_node, const char * name);
+
+elix_html_node elix_html_nodelist_get(elix_html_nodelist * nl, elix_parse_listsize index);
+elix_html_attr elix_html_attrlist_get(elix_html_attrlist * nl, elix_parse_listsize index);
 
 #ifdef __cplusplus
 }

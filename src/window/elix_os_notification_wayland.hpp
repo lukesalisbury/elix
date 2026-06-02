@@ -7,8 +7,7 @@
 #include <dbus-1.0/dbus/dbus.h>
 
 
-typedef struct elix_window_notification_settings
-{
+typedef struct elix_window_notification_settings {
 	/* data */
 	unsigned id;
 	char * icon;
@@ -16,14 +15,9 @@ typedef struct elix_window_notification_settings
 	char * body;
 	char * default_action;
 	char * action_text;
-	
 } elix_window_notification_settings;
 
-
-
-
-struct elix_window_notification
-{
+struct elix_window_notification {
 	/* data */
 	const char * application;
 	/* */
@@ -34,8 +28,7 @@ struct elix_window_notification
 };
 
 
-struct elix_window_notification_message
-{
+struct elix_window_notification_message {
 	elix_window_notification * handler;
 	DBusMessage * message;
 	uint32_t index;

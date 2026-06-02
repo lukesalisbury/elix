@@ -14,6 +14,7 @@ include
 
 [defines]
 PLATFORM_LINUX
+_GNU_SOURCE=1
 [linker_flags]
 -Wl,-rpath -Wl,\$$ORIGIN/lib
 [pkg-linux]

@@ -88,7 +88,7 @@ typedef struct elix_network_interface {
 typedef struct elix_network_peer {
 	elix_ipaddress ip;
 	uint16_t port;
-	elix_socket_handle socket_handle;
+	elix_socket_handle socket_handle; // Should be set to INVALID_SOCKET
 } elix_network_peer;
 
 
@@ -103,7 +103,7 @@ typedef struct elix_networksocket {
 extern "C" {
 #endif
 
-inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
+static inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
 	uint8_t * a = (uint8_t *)p1, * b = (uint8_t *)p2;
 	for (size_t i = 0; i < size; ++i) {
 		if ( a[i] != b[i] ) {
@@ -113,7 +113,7 @@ inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
 	return 1;
 }
 
-inline size_t elix_memcopy( const void * dest, const void * src, size_t size ) {
+static inline size_t elix_memcopy( const void * dest, const void * src, size_t size ) {
 	uint8_t * a = (uint8_t *)dest, * b = (uint8_t *)src;
 	for (size_t i = 0; i < size; ++i) {
 		 a[i] = b[i];
@@ -121,8 +121,17 @@ inline size_t elix_memcopy( const void * dest, const void * src, size_t size ) {
 	return size;
 }
 
+static inline size_t elix_memcopy_flipped( const void * dest, const void * src, size_t size ) {
+	uint8_t * a = (uint8_t *)dest, * b = (uint8_t *)src;
+	size_t index = size - 1;
+	for (size_t i = 0; i < size; ++i) {
+		 a[i] = b[index-i];
+	}
+	return size;
+}
+
 static inline struct sockaddr_in elix_network_socket_address(elix_network_peer * peer) {
-	struct sockaddr_in address = {};
+	struct sockaddr_in address = {0};
 	address.sin_port = htons(peer->port);
 
 	if ( peer->ip.raw[0] ) {
@@ -137,7 +146,7 @@ static inline struct sockaddr_in elix_network_socket_address(elix_network_peer *
 }
 
 static inline elix_network_peer elix_network_ip_address(struct sockaddr_in * peer) {
-	elix_network_peer output = {};
+	elix_network_peer output = {0};
 	if ( peer->sin_family == AF_INET ) {
 		output.ip.ip4.ip = peer->sin_addr.s_addr;
 	} else if ( peer->sin_family == AF_INET6 ) {
@@ -160,14 +169,14 @@ static inline void elix_network_ip_address_set(struct sockaddr_in * sock, elix_n
 }
 
 #ifdef PLATFORM_WINDOWS
-inline void elix_network_init() {
+static inline void elix_network_init() {
 	WSADATA wsaData;
 	int err = WSAStartup(0x0202, &wsaData);
 }
-inline void elix_network_deinit() {
+static inline void elix_network_deinit() {
 	WSACleanup();
 }
-inline elix_network_interface * elix_network_gather_ip_addresses() {
+static inline elix_network_interface * elix_network_gather_ip_addresses() {
 	elix_network_interface * interfaces = nullptr, * new_interface = nullptr;
 	IP_ADAPTER_ADDRESSES peek_address;
 	IP_ADAPTER_ADDRESSES * list_address = nullptr, * current_address = nullptr;
@@ -236,10 +245,10 @@ inline elix_network_interface * elix_network_gather_ip_addresses() {
 	return interfaces;
 }
 #else
-inline void elix_network_init() {}
-inline void elix_network_deinit() {}
+static inline void elix_network_init() {}
+static inline void elix_network_deinit() {}
 
-inline elix_network_interface * elix_network_gather_ip_addresses( uint8_t public_only ) {
+static inline elix_network_interface * elix_network_gather_ip_addresses( uint8_t public_only ) {
 	struct ifaddrs * list_if = nullptr, * current_if;
 	char addr_buffer[NI_MAXHOST] = "";
 	elix_network_interface * interfaces = nullptr, * new_interface = nullptr;
@@ -297,7 +306,7 @@ inline elix_network_interface * elix_network_gather_ip_addresses( uint8_t public
 }
 #endif
 
-inline void elix_network_interface_free(elix_network_interface * head) {
+static inline void elix_network_interface_free(elix_network_interface * head) {
 	elix_network_interface * tmp = nullptr;
 
 	while (head != nullptr) {
@@ -317,6 +326,12 @@ uint8_t elix_networksocket_listen_for_message(elix_networksocket * networksocket
 uint8_t elix_networksocket_receive_message(elix_networksocket * networksocket, elix_allocated_buffer * buffer, elix_network_peer * remote_peer );
 uint8_t elix_networksocket_send_message(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size);
 void elix_networktsocket_close_peer(elix_network_peer * peer);
+
+
+void elix_network_init();
+void elix_network_deinit();
+
+elix_network_interface * elix_network_gather_ip_addresses( uint8_t public_only );
 
 
 #ifdef __cplusplus

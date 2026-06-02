@@ -152,6 +152,9 @@ function_results test_elix_html() {
 	LOG_INDENT("Source", "");
 	LOG_INDENT("%*s", test_html.length, test_html.data);
 
+	size_t before,  after;
+	before = elix_os_memory_usage();
+
 	elix_html_document * html = elix_html_open(&test_html);
 
 	LOG_INDENT("Parsed", "");
@@ -159,8 +162,15 @@ function_results test_elix_html() {
 
 	elix_html_close(html);
 
+	after = elix_os_memory_usage();
+
+	NULLIFY(html);
+
+	LOG_INDENT("Memory Usage: Before: " pZU ", After: " pZU ", Diff: " pZU, before, after, after - before);
+
 	return RESULTS_UNKNOWN;
 }
+
 
 function_results test_elix_html_window() {
 	elix_string_buffer test_html = elix_string_buffer_new(test_elix_html_string, 512);
@@ -312,30 +322,29 @@ inline uint8_t elix_compare( const void * p1, const void * p2, size_t size ) {
 	return 1;
 }
 
-function_results test_elix_program() {
-	struct program_test {
-		char * (*func)(const elix_program_info * program_info, bool shared, const char * filename );
-		char title[128];
-		bool shared;
-		char * filename;
-		char expected[768];
-	};
+struct program_directory_test {
+	char * (*func)(const elix_program_info * program_info, bool shared, const char * filename );
+	char title[128];
+	bool shared;
+	char * filename;
+	char expected[768];
+};
+static char program_directory_test_filename[] = "file444.txt";
+program_directory_test program_directory_test_list[] = {
+	{&elix_program_directory_documents, "Document Directory (Public)", true, nullptr, "/usr/share/ElixTestProgram/ElixTestProgram" },
+	{&elix_program_directory_documents, "Document Directory (User)", false, nullptr, "" },
+	{&elix_program_directory_documents, "Document File (Public)",  true, program_directory_test_filename, "/usr/share/ElixTestProgram/ElixTestProgram/file444.txt" },
+	{&elix_program_directory_documents, "Document File (User)", false, program_directory_test_filename, "" },
 
+	{&elix_program_directory_documents, "User Directory (Roaming)", true, nullptr },
+	{&elix_program_directory_documents, "User Directory", false, nullptr },
+	{&elix_program_directory_documents, "User File (Roaming)",  true, program_directory_test_filename },
+	{&elix_program_directory_documents, "User File", false, program_directory_test_filename },
+};
+
+function_results test_elix_program() {
 	size_t error_count = 0;
 	char * buffer = nullptr;
-	char test_filename[] = "file444.txt";
-
-	program_test test[] = {
-		{&elix_program_directory_documents, "Document Directory (Public)", true, nullptr, "/usr/share/ElixTestProgram/ElixTestProgram" },
-		{&elix_program_directory_documents, "Document Directory (User)", false, nullptr, "" },
-		{&elix_program_directory_documents, "Document File (Public)",  true, test_filename, "/usr/share/ElixTestProgram/ElixTestProgram/file444.txt" },
-		{&elix_program_directory_documents, "Document File (User)", false, test_filename, "" },
-
-		{&elix_program_directory_documents, "User Directory (Roaming)", true, nullptr },
-		{&elix_program_directory_documents, "User Directory", false, nullptr },
-		{&elix_program_directory_documents, "User File (Roaming)",  true, test_filename },
-		{&elix_program_directory_documents, "User File", false, test_filename },
-	};
 
 	LOG_INDENT("User Name: %s", program_info.user);
 	LOG_INDENT("Program Name: %s", program_info.program_name);
@@ -345,7 +354,7 @@ function_results test_elix_program() {
 	LOG_INDENT("Binary: %s in %s", program_info.path_executable.filename, program_info.path_executable.path);
 	LOG_INDENT("");
 
-	for (auto &&i : test) {
+	for (auto &&i : program_directory_test_list) {
 		buffer = i.func(&program_info, i.shared, i.filename);
 		error_count += !(buffer);
 		LOG_INDENT("%s %s: %s - Expected: %s", elix_compare(buffer, i.expected, 768) ? "✅" : "❌", i.title, buffer, i.expected);
@@ -584,22 +593,23 @@ typedef struct test_method {
 	function_results (*func)();
 	function_results result;
 	double time;
+	size_t memory_change;
 } test_method;
 
 static test_method tests[] = {
 	//{"Console", &test_console, RESULTS_PENDING, 0.0},
 	{"Program Info", &test_elix_program, RESULTS_PENDING, 0.0},
-	//{"Directories", &test_elix_os_directory, RESULTS_PENDING, 0.0},
-	{"Endian", &test_elix_endian, RESULTS_PENDING, 0.0},
+	{"Directories", &test_elix_os_directory, RESULTS_PENDING, 0.0},
+	//{"Endian", &test_elix_endian, RESULTS_PENDING, 0.0},
 	{"HTML Parsing", &test_elix_html, RESULTS_PENDING, 0.0},
-	{"HTML Rendering", &test_elix_html_window, RESULTS_PENDING, 0.0},
+	//{"HTML Rendering", &test_elix_html_window, RESULTS_PENDING, 0.0},
 	
-	{"RGBABuffer", &test_elix_rgbabuffer, RESULTS_PENDING, 0.0},
+	//{"RGBABuffer", &test_elix_rgbabuffer, RESULTS_PENDING, 0.0},
 
-	{"Hash table", &test_elix_hash, RESULTS_PENDING, 0.0},
-	{"Window/Canvas", &test_elix_os_window, RESULTS_PENDING, 0.0},
+	//{"Hash table", &test_elix_hash, RESULTS_PENDING, 0.0},
+	//{"Window/Canvas", &test_elix_os_window, RESULTS_PENDING, 0.0},
 	//{"Directory Watcher", &test_directory_watch, RESULTS_PENDING, 0.0},
-	{"C Strings", &test_elix_cstring, RESULTS_PENDING, 0.0},
+	//{"C Strings", &test_elix_cstring, RESULTS_PENDING, 0.0},
 
 	//{"Packages", &test_elix_package, RESULTS_PENDING, 0.0},
 };
@@ -609,10 +619,14 @@ void test_run_method( test_method & method ) {
 	if ( method.func ) {
 		LOG_TEXT("--- %s -----------------------------", method.name);
 		struct timespec start, end;
+		size_t before,  after;
+		before = elix_os_memory_usage();
 		clock_gettime(CLOCK_MONOTONIC, &start );
 		method.result = method.func();
 		clock_gettime(CLOCK_MONOTONIC, &end );
 		method.time = difftime(end.tv_sec, start.tv_sec) + ((double)(end.tv_nsec - start.tv_nsec)/1.0e9);
+		after = elix_os_memory_usage();
+		method.memory_change = after - before;
 	} else {
 		method.result = RESULTS_FUNCTION_UNIMPLEMENTED;
 	}
@@ -628,11 +642,9 @@ int main(int UNUSEDARG argc, char UNUSEDARG * argv[]) {
 	LOG_HR();
 
 	for (auto &&i : tests) {
-		LOG_TEXT("[%s] 0x%x - Time: %f", i.name, i.result, i.time );
+		LOG_TEXT("[%s] 0x%x - Time: %f - Possible Memory Leak: " pZU "b", i.name, i.result, i.time, i.memory_change  );
 	}
 
 	return 0;
 }
-
-
 

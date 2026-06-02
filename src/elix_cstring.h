@@ -55,7 +55,7 @@ bool elix_cstring_has_prefix( const char * str, const char * prefix );
 
 void  elix_cstring_sanitise( char * string );
 size_t elix_cstring_trim( char * string );
-
+uint8_t elix_cstring_compare( const char * primary, const char * secondary);
 
 size_t elix_ucstring_length(const uint8_t * string, uint8_t include_terminator );
 size_t elix_cstring_length(const char * string, uint8_t include_terminator);

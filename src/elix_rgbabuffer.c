@@ -717,7 +717,8 @@ elix_text_metrics rbgabuffer_measureText(rbgabuffer_context* ctx, const char * t
 	int baseline = (int) (ascent * font_scale);
 	int descent_scaled = (int) (descent * font_scale);
 
-	char * object, * next_object = (char*)text;
+	char * object = (char*)text;
+	char * next_object = object;
 	uint32_t current_character = 0, next_character = 0;
 	while ( (current_character = elix_cstring_next_character(object, &next_object)) > 0  ) {
 		next_character = elix_cstring_peek_character(next_object);

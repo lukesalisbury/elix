@@ -17,10 +17,10 @@ typedef struct elix_string {
 typedef struct elix_string_buffer {
 	uint8_t * data;
 	uint8_t * iter;
-	bool16 owned;
 	uint32_t length;
 	uint32_t allocated;
 	uint32_t location;
+	bool16 owned;
 } elix_string_buffer;
 
 typedef struct elix_string_pointer {
@@ -42,6 +42,9 @@ typedef struct elix_parse_status {
 	size_t offset;
 	size_t length;
 } elix_parse_status;
+
+
+typedef uint16_t elix_parse_listsize;
 
 #ifdef __cplusplus
 extern "C" {

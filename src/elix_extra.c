@@ -98,6 +98,7 @@ elix_http_request elix_http_request_parse(elix_allocated_buffer * buffer, bool h
 }
 
 int64_t elix_cstring_convert_to_int(const char * str) {
+	///TODO: Handle negative, check value
 	if ( str == nullptr ) {
 		return 0;
 	}
@@ -105,6 +106,7 @@ int64_t elix_cstring_convert_to_int(const char * str) {
 	int64_t result = 0;
 	uint8_t c, v;
 	uint8_t hex = ( str[0] == '0' && (str[1] == 'x' || str[1] == 'X') );
+	uint8_t neg = ( str[0] == '-' );
 	if ( hex ) {
 		str += 2;
 		while ((c = *str++)) {
@@ -112,7 +114,6 @@ int64_t elix_cstring_convert_to_int(const char * str) {
 				v = (c & 0xF) + (c >> 6) | ((c >> 3) & 0x8);
 				result = (result << 4) | (uint64_t) v;
 			}
-			
 		}
 	} else {
 		while ( (c = *str++)) {
@@ -121,6 +122,10 @@ int64_t elix_cstring_convert_to_int(const char * str) {
 			}
 			
 		}
+		if (neg) {
+			result = result * -1;
+		}
+		
 	}
 	
 	return result;

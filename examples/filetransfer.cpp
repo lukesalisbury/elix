@@ -95,14 +95,10 @@ bool elix_filetransfer_listenudp(elix_filetranfer_peer_list & peers, elix_networ
 	elix_allocated_buffer buffer;
 	elix_network_peer remote_peer = {};
 	if ( elix_networksocket_receive_message(&socket, &buffer, &remote_peer) ) {
-		/*
-		std::cout << "Receive from ";
-		std::cout << +remote_peer.ip.ip4.octel[0] << ".";
-		std::cout << +remote_peer.ip.ip4.octel[1] << ".";
-		std::cout << +remote_peer.ip.ip4.octel[2] << ".";
-		std::cout << +remote_peer.ip.ip4.octel[3] << " via " << socket.socket_type << std::endl;
-		std::cout << "Size: " << buffer.actual_size << " - " << buffer.data << std::endl;
-		*/
+		
+		LOG_INFO( "Receive from %d.%d.%d.%d via %d", +remote_peer.ip.ip4.octel[0], +remote_peer.ip.ip4.octel[1], +remote_peer.ip.ip4.octel[2], +remote_peer.ip.ip4.octel[3], socket.socket_type);
+		LOG_INFO( "Size: %u - %s", buffer.actual_size, buffer.data);
+		
 		switch (buffer.data[0]) {
 			case 0x01: {
 				//std::cout << "Hello MSG Broadcast" << std::endl;
@@ -300,7 +296,7 @@ bool elix_filetransfer_sendviadukto(elix_network_peer & peer, uint8_t * name, ui
 	return true;
 }
 
-int test_main()
+int main()
 {
 	elix_networksocket udp, tcp;
 	
@@ -309,7 +305,7 @@ int test_main()
 	elix_network_peer broadcast_peer = { {.ip4={.ip=0xFFFFFFFF} }, 4644};
 	elix_network_peer any_peer = { {0x00000000, 0x00000000}, 4644};
 	elix_network_peer test_peer = { {0x00000000, 0x00000000}, 4644};
-	test_peer.ip.ip4.ip = 0x5110A8C0;
+	test_peer.ip.ip4.ip = 0x6310A8C0;
 
 	//uint8_t broadcast_hello[] = {0x01, 'T', ' ', 'a', 't', ' ', 0};
 	uint8_t broadcast_hello[] = "\1TestBot at address (CLI)";
@@ -318,7 +314,7 @@ int test_main()
 	elix_networksocket_create(&udp, UDP, &any_peer, true);
 	elix_networksocket_create(&tcp, TCP, &any_peer, true);
 	
-	//elix_filetransfer_sendviadukto(test_peer, nullptr, (uint8_t*)"Hello world sdaf");
+	elix_filetransfer_sendviadukto(test_peer, nullptr, (uint8_t*)"Hello world sdaf");
 	elix_filetransfer_sendviadukto(test_peer, (uint8_t*)"genscript.c", nullptr);
 
 	elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, 26);
@@ -337,7 +333,7 @@ int test_main()
 
 char blank_string[256] = {'\0'};
 
-int main(int argc, char *argv[]) {
+int amain(int argc, char *argv[]) {
 	char * arg0 = argv[0];
 
 	notify_incomingfile = elix_window_notification_settings_create("Incoming File", blank_string, "", "");

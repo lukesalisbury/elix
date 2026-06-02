@@ -11,7 +11,7 @@
 *************************************************************************/
 //TODO: Fix Complier selection
 
-#define GENSCRIPT_VERSION 20250705
+#define GENSCRIPT_VERSION 20260601 // Changes: Increase buffer size for defaults list
 
 #define SOURCE_DIRECTORY "src"
 //#define SOURCE_DIRECTORY "source"
@@ -964,7 +964,7 @@ compile_cpp=${compiler} ${compiler_includes} ${compller_defines} ${compiler_cpp_
 compile_c=${compiler} ${compiler_includes} ${compller_defines} ${compiler_c_flags} ${compiler_flags} -o $out -c $in\n\
 link_shared=${linker} -shared ${compiler_lib_flags} $in -o ${binary_prefix}$out  ${compiler_lib}\n\
 link_static=${static_linker} ${object_dir}/$out $in \n\
-link=${linker} ${compiler_lib_flags} $in -o ${binary_prefix}$out ${compiler_lib} \n\
+link=${linker} ${compiler_lib_flags} $in -o ${binary_prefix}$out ${compiler_linker_flags} ${compiler_lib} \n\
 finalise=${finaliser} ${finalise_flags} $in -o ${binary_prefix}$out\n\
 build_resources=echo\n\
 clean=rm -rf ${object_dir}\n\
@@ -1049,7 +1049,7 @@ typedef enum {
 } program_mode;
 
 typedef enum {
-	JCO_DEFINES, JCO_FLAGS, JCO_LIBS, JCO_LIBS_FLAGS, JCO_FINAL_FLAGS, JCO_INCLUDE
+	JCO_DEFINES, JCO_FLAGS, JCO_LIBS, JCO_LIBS_FLAGS, JCO_FINAL_FLAGS, JCO_INCLUDE, JCO_LINKER_FLAGS
 } join_config_options;
 
 typedef enum {
@@ -1075,6 +1075,7 @@ typedef struct {
 	ConfigList flags;
 	ConfigList libs;
 	ConfigList lib_flags;
+	ConfigList linker_flags;
 	ConfigList final_flags;
 	ConfigList includes;
 	ConfigList modules;
@@ -1608,6 +1609,10 @@ uint32_t parse_txtcfg( const char * filename, CurrentConfiguration * options, Co
 				write_mode = 1;
 				write_options = &options->final_flags;
 				write_map = nullptr;
+			} else if ( elix_cstring_has_prefix(data,"[linker_flags]") ) {
+				write_mode = 1;
+				write_options = &options->linker_flags;
+				write_map = nullptr;
 			} else if ( elix_cstring_has_prefix(data,"[flags]") ) {
 				write_mode = 1;
 				write_options = &options->flags;
@@ -1701,6 +1706,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 		{ "%s ", &options->lib_flags, nullptr, nullptr},
 		{ "%s ", &options->final_flags, nullptr, nullptr},
 		{ "-I%s ", &options->includes, "-I", nullptr},
+		{ "%s ", &options->linker_flags, nullptr, nullptr},
 	};
 	char platform_file[128] = "./config/$platform-common.txt";
 	char arch_file[128] = "./config/$platform-$arch.txt";
@@ -1746,6 +1752,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 
 	elix_file_write_formatted(&file, "compiler_lib = %s\n", ini_list[JCO_LIBS].buffer);
 	elix_file_write_formatted(&file, "compiler_lib_flags = %s\n", ini_list[JCO_LIBS_FLAGS].buffer);
+	elix_file_write_formatted(&file, "compiler_linker_flags = %s\n", ini_list[JCO_LINKER_FLAGS].buffer);
 	elix_file_write_formatted(&file, "compiler_flags = %s\n", ini_list[JCO_FLAGS].buffer);
 	elix_file_write_formatted(&file, "compiler_includes = %s\n", ini_list[JCO_INCLUDE].buffer);
 	elix_file_write_formatted(&file, "compller_defines = %s\n", ini_list[JCO_DEFINES].buffer);
@@ -1818,7 +1825,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 
 	char objects[6144] = {0};
 	char resources[6144] = {0};
-	char defaults[256] = {0};
+	char defaults[1024] = {0};
 
 	if ( options->resources.current ) {
 		for (size_t i = 0; i < options->resources.current; i++){
@@ -1847,7 +1854,7 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 
 		}
 		elix_file_write_formatted(&file, ninja_extension_output[3].content, resources);
-		elix_cstring_append(defaults, 255, "${object_dir}/resources ", 24);
+		elix_cstring_append(defaults, 1023, "${object_dir}/resources ", 24);
 	}
 
 	//parse_filelist("base", &options->files, &options->modules);
@@ -1896,16 +1903,16 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 				LOG_INFO("\tStatic Lib: %s", current_name);
 				elix_file_write_formatted(&file, ninja_extension_output[2].content, current_name, objects,current_name,current_name);
 		
-				elix_cstring_append(defaults, 255, current_name, elix_cstring_length(current_name, 0));
-				elix_cstring_append(defaults, 255, "${binary_suffix}${static_suffix} ", 34);
+				elix_cstring_append(defaults, 1023, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1023, "${binary_suffix}${static_suffix} ", 34);
 
 				break;
 			case LT_SHARED:
 				LOG_INFO("\tShared Lib: %s", current_name);
 				elix_file_write_formatted(&file, ninja_extension_output[1].content, current_name, objects);
 
-				elix_cstring_append(defaults, 255, current_name, elix_cstring_length(current_name, 0));
-				elix_cstring_append(defaults, 255, "${binary_suffix}${shared_suffix} ", 34);
+				elix_cstring_append(defaults, 1023, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1023, "${binary_suffix}${shared_suffix} ", 34);
 
 				break;
 			case LT_SKIP:
@@ -1919,8 +1926,8 @@ uint32_t fg_build_ninja(CompilerInfo * target, CurrentConfiguration * options, c
 
 				elix_file_write_formatted(&file, ninja_extension_output[0].content, current_name, objects);
 				
-				elix_cstring_append(defaults, 255, current_name, elix_cstring_length(current_name, 0));
-				elix_cstring_append(defaults, 255, "${binary_suffix}${program_suffix} ", 35);
+				elix_cstring_append(defaults, 1023, current_name, elix_cstring_length(current_name, 0));
+				elix_cstring_append(defaults, 1023, "${binary_suffix}${program_suffix} ", 35);
 				break;
 		}
 		elix_file_write_string(&file, "\n", 1);
@@ -1962,6 +1969,7 @@ uint32_t fg_build_shellscript(CompilerInfo * target, CurrentConfiguration * opti
 		{ "%s ", &options->lib_flags, nullptr, nullptr},
 		{ "%s ", &options->final_flags, nullptr, nullptr},
 		{ "-I%s ", &options->includes, "-I", nullptr},
+		{ "%s ", &options->linker_flags, nullptr, nullptr},
 	};
 	char platform_file[128] = "./config/$platform-common.txt";
 	char arch_file[128] = "./config/$platform-$arch.txt";
@@ -2016,6 +2024,7 @@ uint32_t fg_build_shellscript(CompilerInfo * target, CurrentConfiguration * opti
 
 	elix_file_write_formatted(&file, "compiler_lib=\"%s\"\n", ini_list[JCO_LIBS].buffer);
 	elix_file_write_formatted(&file, "compiler_lib_flags=\"%s\"\n", ini_list[JCO_LIBS_FLAGS].buffer);
+	elix_file_write_formatted(&file, "compiler_linker_flags = %s\n", ini_list[JCO_LINKER_FLAGS].buffer);
 	elix_file_write_formatted(&file, "compiler_flags=\"%s\"\n", ini_list[JCO_FLAGS].buffer);
 	elix_file_write_formatted(&file, "compiler_includes=\"%s\"\n", ini_list[JCO_INCLUDE].buffer);
 	elix_file_write_formatted(&file, "compller_defines=\"%s\"\n", ini_list[JCO_DEFINES].buffer);
@@ -2086,7 +2095,7 @@ uint32_t fg_build_shellscript(CompilerInfo * target, CurrentConfiguration * opti
 
 		}
 		elix_file_write_formatted(&file, ninja_extension_output[3].content, resources);
-		elix_cstring_append(defaults, 255, "${object_dir}/resources ", 24);
+		elix_cstring_append(defaults, 1023, "${object_dir}/resources ", 24);
 	}
 	*/
 
@@ -2239,6 +2248,7 @@ uint32_t fg_build_batch(CompilerInfo * target, CurrentConfiguration * options, c
 		{ "%s ", &options->lib_flags, nullptr, nullptr},
 		{ "%s ", &options->final_flags, nullptr, nullptr},
 		{ "-I%s ", &options->includes, "-I", nullptr},
+		{ "%s ", &options->linker_flags, nullptr, nullptr},
 	};
 	char platform_file[128] = "./config/$platform-common.txt";
 	char arch_file[128] = "./config/$platform-$arch.txt";
@@ -2286,9 +2296,10 @@ uint32_t fg_build_batch(CompilerInfo * target, CurrentConfiguration * options, c
 
 	elix_file_write_formatted(&file, "set compiler_lib=%s\n", ini_list[JCO_LIBS].buffer);
 	elix_file_write_formatted(&file, "set compiler_lib_flags=%s\n", ini_list[JCO_LIBS_FLAGS].buffer);
+	elix_file_write_formatted(&file, "set compiler_linker_flags=%s\n", ini_list[JCO_LINKER_FLAGS].buffer);
 	elix_file_write_formatted(&file, "set compiler_flags=%s\n", ini_list[JCO_FLAGS].buffer);
 	elix_file_write_formatted(&file, "set compiler_includes=%s\n", ini_list[JCO_INCLUDE].buffer);
-	elix_file_write_formatted(&file, "set compller_defines=%s\n", ini_list[JCO_DEFINES].buffer);
+	elix_file_write_formatted(&file, "set compiler_defines=%s\n", ini_list[JCO_DEFINES].buffer);
 	elix_file_write_string_from_compilerinfo(&file, "set compiler_mode=$mode\n", target);
 
 	elix_file_write_formatted(&file, "set finaliser_flags=%s\n", ini_list[JCO_FINAL_FLAGS].buffer);
@@ -2358,7 +2369,7 @@ uint32_t fg_build_batch(CompilerInfo * target, CurrentConfiguration * options, c
 
 		}
 		elix_file_write_formatted(&file, ninja_extension_output[3].content, resources);
-		elix_cstring_append(defaults, 255, "${object_dir}/resources ", 24);
+		elix_cstring_append(defaults, 1023, "${object_dir}/resources ", 24);
 	}
 	*/
 

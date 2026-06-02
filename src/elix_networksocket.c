@@ -1,3 +1,20 @@
+/***********************************************************************************************************************
+ Copyright (c) Luke Salisbury
+ This software is provided 'as-is', without any express or implied warranty. In no event will the authors be held
+ liable for any damages arising from the use of this software.
+
+ Permission is granted to anyone to use this software for any purpose, including commercial applications, and to alter
+ it and redistribute it freely, subject to the following restrictions:
+
+ 1. The origin of this software must not be misrepresented; you must not claim that you wrote the original software.
+	If you use this software in a product, an acknowledgment in the product documentation would be appreciated but is
+	not required.
+ 2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original
+	software.
+ 3. This notice may not be removed or altered from any source distribution.
+***********************************************************************************************************************/
+///Note: Requires building with -D_GNU_SOURCE=1 or --std=gnu*
+
 #include "elix_networksocket.h"
 
 #if !defined (INVALID_SOCKET)
@@ -69,13 +86,37 @@ uint8_t elix_networksocket_listen_for_message(elix_networksocket * networksocket
 		return 0;
 	}
 	int read = 0;
-	struct sockaddr_in remote = {};
+	struct sockaddr_in remote = {0};
 	socklen_t remote_size = sizeof(remote);
 	int peer_socket = 0;
 	peer_socket = accept(networksocket->socket_handle, (struct sockaddr*)&remote, &remote_size);
 	if ( peer_socket != INVALID_SOCKET ) {
 		elix_network_ip_address_set(&remote, remote_peer);
 		remote_peer->socket_handle = peer_socket;
+		return 1;
+	} else {
+		LOG_ERROR("an error: %s", strerror(errno));
+	}
+	return 0;
+}
+
+uint8_t elix_networksocket_response_message(elix_networksocket * networksocket, elix_allocated_buffer * buffer ) {
+	int read = 0;
+	buffer->actual_size = 0;
+
+	if ( networksocket->socket_type == TCP ) {
+		read = recv(networksocket->socket_handle, buffer->data, buffer->data_size, 0);
+		if ( read > 0 ) {
+			buffer->actual_size = read;
+			LOG_INFO( "Socket Read: %d Bytes", read);
+		} else if ( read < 0 ) {
+			LOG_ERROR( "recv Error: %s", strerror(errno));
+		}
+	} else {
+		LOG_ERROR("For non TCP response, user elix_networksocket_receive_message");
+	}
+
+	if ( read > 0 ) {
 		return 1;
 	}
 	return 0;
@@ -100,7 +141,7 @@ uint8_t elix_networksocket_receive_message(elix_networksocket * networksocket, e
 
 		if ( read > 0 ) {
 			buffer->actual_size = read;
-			LOG_INFO( "Sockect Read: %d Bytes", read);
+			LOG_INFO( "Socket Read: %d Bytes", read);
 		} else if ( read < 0 ) {
 			LOG_ERROR( "recv Error: %s", strerror(errno));
 		}
@@ -129,7 +170,7 @@ uint8_t elix_networksocket_send_message(elix_networksocket * networksocket, elix
 	ssize_t results = 0;
 	LOG_INFO("Sending Message to: %d.%d.%d.%d", target->ip.ip4.octel[0], target->ip.ip4.octel[1], target->ip.ip4.octel[2], target->ip.ip4.octel[3]);
 	if ( networksocket->socket_type == TCP ) {
-		results = send(target->socket_handle, NATIVE_BUFFER_TYPE(message), message_size, 0);
+		results = send(networksocket->socket_handle, NATIVE_BUFFER_TYPE(message), message_size, 0);
 	} else if ( networksocket->socket_type == UDP) {
 		results = sendto(networksocket->socket_handle, (const char*)message, message_size, 0, (struct sockaddr*)&address, sizeof (address));
 	}
@@ -137,12 +178,10 @@ uint8_t elix_networksocket_send_message(elix_networksocket * networksocket, elix
 	if ( results == -1 ) {
 		LOG_INFO( "Send Error: %s", strerror(errno) );
 	}
-
 	
 	LOG_INFO("Results: %d ", results );
 	return 0;
 }
-
 
 void elix_networktsocket_close_peer(elix_network_peer * peer) {
 	close(peer->socket_handle);

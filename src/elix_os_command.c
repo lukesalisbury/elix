@@ -31,14 +31,12 @@ void elix_os_command_capture_unsafe( const char * program_and_arguments, char * 
 	size_t str_size = 0;
 	size_t str_position = 0;
 
-
 	str_size = elix_cstring_length(program_and_arguments, 1);
 
 	if ( str_size > 0x1FF ) {
 		LOG_INFO("Command length is to much: %s", program_and_arguments);
 		return;
 	}
-
 
 	FILE * command_pipe = popen(program_and_arguments, "r");
 	if ( !command_pipe ) {

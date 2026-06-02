@@ -50,6 +50,8 @@ extern "C" {
 #endif
 
 elix_json elix_json_open(elix_string_buffer * data);
+void elix_json_print(elix_json *doc);
+
 
 #ifdef __cplusplus
 }

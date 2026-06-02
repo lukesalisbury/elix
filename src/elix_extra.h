@@ -14,8 +14,8 @@
  3. This notice may not be removed or altered from any source distribution.
 ***********************************************************************************************************************/
 
-#ifndef ELIX_EXTRA_HPP
-#define ELIX_EXTRA_HPP
+#ifndef ELIX_EXTRA_HEADER
+#define ELIX_EXTRA_HEADER
 
 #include "elix_core.h"
 #include "elix_cstring.h"
@@ -45,19 +45,11 @@ void elix_ucstring_copy( const unsigned char * source_init, char * dest_init, si
 
 elix_http_request elix_http_request_parse(elix_allocated_buffer * buffer, bool header_copy, bool body_copy);
 
+int64_t elix_cstring_convert_to_int(const char * str);
+
 #ifdef __cplusplus
 }
 #endif
 
-int64_t elix_cstring_convert_to_int(const char * str);
 
-
-
-
-
-
-
-
-
-
-#endif // ELIX_EXTRA_HPP
+#endif // ELIX_EXTRA_HEADER
