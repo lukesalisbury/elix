@@ -25,7 +25,7 @@
 			"program": "${workspaceFolder}/bin/test-debug-linux-x86_64",
 			"linux": {
 				"miDebuggerPath": "/usr/bin/gdb",
-				"program": "${workspaceFolder}/bin/test-debug-linux-x86_64",
+				"program": "${workspaceFolder}/bin/https_client-debug-linux-x86_64",
 				"args": [],
 
 			},

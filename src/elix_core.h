@@ -128,26 +128,27 @@ typedef struct elix_databuffer {
 	#define LOG_OUTPUT_MESSAGE stdout
 
 	#define NAMEDLOG_MESSAGE(N, M, ...) printf("%23s | " M "\n", N, ##__VA_ARGS__)
-	#define LOG_INFO(M, ...) printf( M "\n", ##__VA_ARGS__)
-	
+
 	#ifdef _DEBUG
-		#define PRINT(M, ...) printf( M "\n", ##__VA_ARGS__)
+		#define LOG_INFO(M, ...) printf( M "\n", ##__VA_ARGS__)		
 	#else
-		#define PRINT(M, ...) 
+		#define LOG_INFO(M, ...) 
 	#endif
 
+	#define LOG_PRINT(M, ...) printf( M "\n", ##__VA_ARGS__)
 	#define LOG_MESSAGE(M, ...) printf("%24s:%04d | " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 	#define LOGF_MESSAGE(M, ...) printf("%21s() | " M "\n", __func__, ##__VA_ARGS__)
 	#define LOG_ERROR(M, ...) fprintf(LOG_OUTPUT_ERROR, "%18s:%04d | " M "\n",__FILE__, __LINE__, ##__VA_ARGS__)
 	#define LOGF_ERROR(M, ...) fprintf(LOG_OUTPUT_ERROR, "%21s() | " M "\n", __func__, ##__VA_ARGS__)
 #else
 	#define NAMEDLOG_MESSAGE(N,M, ...)
+	#define DEBUG_INFO(M, ...)
 	#define LOG_INFO(M, ...)
 	#define LOG_MESSAGE(M, ...)
 	#define LOG_ERROR(M, ...)
 	#define LOGF_MESSAGE(M, ...)
 	#define LOGF_ERROR(M, ...)
-	#define PRINT(M, ...) 
+	#define LOG_PRINT(M, ...) 
 #endif // ELIX_SKIP_CORE_LOG
 
 

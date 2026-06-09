@@ -59,7 +59,7 @@ bool isPrimitiveNumber(uint32_t c, uint32_t counter) {
 }
 
 uint32_t elix_string_peek_match(elix_string_buffer * text, elix_parse_status status, const char * needle, uint8_t needle_length) {
-	text->iter = text->data + status.offset + 1;
+	text->iter = text->string.data + status.offset + 1;
 	for (uint8_t i = 0; i < needle_length; i++) {
 		if ( text->iter[i] != needle[i] ) {
 			return 0;
@@ -91,7 +91,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 		text_length++;
 
 		/*
-		PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+		LOG_PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 		state = STATECHANGE(PARSE_ERROR, d);
 		return current;
 		*/
@@ -103,11 +103,11 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 					//Continue as PARSE_OBJECT
 				} else if ( char32.value == '}' ) {
 					return current;
-				} else if ( doc->reference->location > doc->reference->length ) {
+				} else if ( doc->reference->string.location > doc->reference->string.length ) {
 					return current;
 				} else {
 					state = STATECHANGE(PARSE_ERROR, d);
-					PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					return current;
 				}
 				break;
@@ -116,7 +116,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 					text_length--; //Remove the last "
 					index = ++doc->index;
 					if ( doc->index >= 256 ) {
-						PRINT("Passed the token limit of JSON parsing. Exiting.");
+						LOG_PRINT("Passed the token limit of JSON parsing. Exiting.");
 						return current;
 					}
 
@@ -127,7 +127,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 
 				} else {
 					state = STATECHANGE(PARSE_ERROR, d);
-					PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					return current;
 				}
 				
@@ -136,7 +136,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 				if ( char32.value == ':' ) {
 					state = STATECHANGE(PARSE_VALUE, d);
 				} else {
-					PRINT("Error missing : at " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("Error missing : at " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					state = STATECHANGE(PARSE_ERROR, d);
 					
 					return current;
@@ -185,7 +185,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 
 						state = STATECHANGE(PARSE_OBJECT, d);
 					} else {
-						PRINT("Error PARSE_VALUE at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 8 ? 0 : 8, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+						LOG_PRINT("Error PARSE_VALUE at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 8 ? 0 : 8, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 						state = STATECHANGE(PARSE_ERROR, d);
 						return current;
 					}
@@ -195,7 +195,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 					state = STATECHANGE(PARSE_PRIMITIVE, d);
 				} else {
 					state = STATECHANGE(PARSE_ERROR, d);
-					PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					return current;
 				}
 				break;
@@ -214,7 +214,7 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 					int q = 1;
 				} else {
 					state = STATECHANGE(PARSE_ERROR, d);
-					PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					return current;
 				}
 				break;
@@ -224,14 +224,14 @@ elix_parse_status elix_json_parse_object(elix_json * doc, uint16_t parent_index,
 					state = STATECHANGE(PARSE_OBJECT, d);
 				} else if ( char32.value == '[' ) {
 					state = STATECHANGE(PARSE_ERROR, d);
-					PRINT("2D array not supported yet. char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("2D array not supported yet. char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					return current;
 
 				} else if ( char32.value ) {
 
 				} else {
 					state = STATECHANGE(PARSE_ERROR, d);
-					PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
+					LOG_PRINT("Error at char " pZD "\n%.*s\n%*c^", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 					return current;
 				}
 				break;
@@ -270,7 +270,7 @@ elix_parse_status elix_json_parse(elix_json * doc, elix_parse_status * lastStatu
 
 	elix_parse_status current = {0};
 
-	current.length = doc->reference->length;
+	current.length = doc->reference->string.length;
 	if ( lastStatus != nullptr ) {
 		//TODO: Continue parsing from a point
 		if ( lastStatus->offset > current.length ) {
@@ -290,7 +290,7 @@ elix_parse_status elix_json_parse(elix_json * doc, elix_parse_status * lastStatu
 	elix_character char32, previous_char32, ending_char32;
 	
 	//Set up pointer to current character
-	doc->reference->iter = doc->reference->data + current.offset;
+	doc->reference->iter = doc->reference->string.data + current.offset;
 
 	do {
 		char32 = elix_character_next(doc->reference);
@@ -317,7 +317,7 @@ elix_parse_status elix_json_parse(elix_json * doc, elix_parse_status * lastStatu
 
 
 void elix_json_print(elix_json *doc) {
-	PRINT("=======================================");
+	LOG_PRINT("=======================================");
 	uint8_t d = 0;
 	uint16_t parent = 0;
 	for (uint16_t i = 0; i <= doc->index; i++) {
@@ -326,36 +326,36 @@ void elix_json_print(elix_json *doc) {
 				/* code */
 				break;
 			case JSON_OBJECT:
-				PRINT("%*s'%.*s' = {", d*2, " ", doc->tokens[i].key_length, doc->reference->data + doc->tokens[i].key_offset);
+				LOG_PRINT("%*s'%.*s' = {", d*2, " ", doc->tokens[i].key_length, doc->reference->string.data + doc->tokens[i].key_offset);
 				parent = i;
 				d++;
 				break;
 			case JSON_ARRAY:
-				PRINT("%*s'%.*s' = [Array]", d*2, " ", doc->tokens[i].key_length, doc->reference->data + doc->tokens[i].key_offset);
+				LOG_PRINT("%*s'%.*s' = [Array]", d*2, " ", doc->tokens[i].key_length, doc->reference->string.data + doc->tokens[i].key_offset);
 				if ( parent != doc->tokens[i].parent ) {
 					d--;
-					PRINT("%*s}", d*2, " ");
+					LOG_PRINT("%*s}", d*2, " ");
 				}
 				break;
 			case JSON_NUMBER:
 				if ( parent != doc->tokens[i].parent ) {
 					d--;
-					PRINT("%*s}", d*2, " ");
+					LOG_PRINT("%*s}", d*2, " ");
 				}
-				PRINT("%*s'%.*s': %.*s", d*2, " ", doc->tokens[i].key_length, doc->reference->data + doc->tokens[i].key_offset, doc->tokens[i].data_length, doc->reference->data + doc->tokens[i].data_offset);
+				LOG_PRINT("%*s'%.*s': %.*s", d*2, " ", doc->tokens[i].key_length, doc->reference->string.data + doc->tokens[i].key_offset, doc->tokens[i].data_length, doc->reference->string.data + doc->tokens[i].data_offset);
 
 				break;
 			default:
 				if ( parent != doc->tokens[i].parent ) {
 					d--;
-					PRINT("%*s}", d*2, " ");
+					LOG_PRINT("%*s}", d*2, " ");
 				}
-				PRINT("%*s'%.*s': '%.*s'", d*2, " ", doc->tokens[i].key_length, doc->reference->data + doc->tokens[i].key_offset, doc->tokens[i].data_length, doc->reference->data + doc->tokens[i].data_offset);
+				LOG_PRINT("%*s'%.*s': '%.*s'", d*2, " ", doc->tokens[i].key_length, doc->reference->string.data + doc->tokens[i].key_offset, doc->tokens[i].data_length, doc->reference->string.data + doc->tokens[i].data_offset);
 
 				break;
 		}
 	}
-	PRINT("=======================================");
+	LOG_PRINT("=======================================");
 }
 
 elix_json elix_json_open(elix_string_buffer * content) {
@@ -363,11 +363,11 @@ elix_json elix_json_open(elix_string_buffer * content) {
 
 	size_t first_character = 0;
 
-	while ( first_character < content->length && isWhiteSpace(content->data[first_character]) ) {
+	while ( first_character < content->string.length && isWhiteSpace(content->string.data[first_character]) ) {
 	    first_character++;
 	}
 
-	if ( content->data[first_character] == '{' ) {
+	if ( content->string.data[first_character] == '{' ) {
 		doc.reference = content;
 
 		elix_json_parse(&doc, nullptr);

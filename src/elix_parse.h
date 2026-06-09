@@ -6,22 +6,26 @@
 #include <string.h>
 
 typedef struct elix_string {
-	uint8_t * text;
-	bool16 owned;
+	uint8_t * data;
 	uint16_t length;
 	uint16_t allocated;
 	uint16_t location;
+	bool16 owned;
 } elix_string;
 
-
 typedef struct elix_string_buffer {
+	elix_string string;
+	uint8_t * iter;
+} elix_string_buffer;
+
+typedef struct elix_string_buffer2 {
 	uint8_t * data;
 	uint8_t * iter;
 	uint32_t length;
 	uint32_t allocated;
 	uint32_t location;
 	bool16 owned;
-} elix_string_buffer;
+} elix_string_buffer2;
 
 typedef struct elix_string_pointer {
 	elix_string_buffer * source;
@@ -52,9 +56,12 @@ extern "C" {
 
 elix_string elix_string_new(uint16_t allocate);
 void elix_string_clear(elix_string * str);
+void elix_string_append_data(elix_string * str, uint8_t * data, uint16_t data_size );
 void elix_string_append_byte(elix_string * str, uint8_t byte );
 void elix_string_append(elix_string * str, uint32_t char32 );
 
+
+elix_string_buffer elix_string_buffer_new(const char * string, size_t length);
 uint32_t elix_string_buffer_forward( elix_string_buffer * str, uint32_t count );
 elix_string_pointer elix_string_buffer_get_pointer( elix_string_buffer * buffer, size_t offset, size_t length );
 elix_character elix_string_buffer_next( elix_string_buffer * text );

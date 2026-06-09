@@ -1,4 +1,5 @@
 #include "elix_core.h"
+#include "signal.h"
 /*
 size_t elix_buffer_find(char * buffer, size_t length, char * search, size_t sl , size_t offset, bool after) {
 	char * debug = buffer;
@@ -258,7 +259,7 @@ deflate: https://github.com/fxfactorial/sdefl/
 gzip: https://github.com/richgel999/miniz/
 br: Brotli 
 zstd:
-uint8_t elix_networksocket_send_compressed_message(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size) {
+function_results elix_networksocket_send_compressed_message(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size) {
 	struct sockaddr_in address = elix_network_socket_address(target);
 
 	ssize_t results = 0;
@@ -322,7 +323,7 @@ function_results http_handle_request(elix_http_request * request, elix_networkso
 			elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46);
 		}
 	} else {
-		elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 45);
+		elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46);
 	}
 	return RESULTS_SUCCESS;
 }
@@ -334,33 +335,37 @@ function_results http_server_loop(uint16_t listening_port) {
 
 	elix_network_interface * local_interface = elix_network_gather_ip_addresses(true);
 
-	elix_network_peer server_peer = { {0x00000000, 0x00000000}, listening_port};
+	elix_network_peer server_peer = { ELIX_SOCKET_NOTSET, {0x00000000, 0x00000000}, listening_port};
 	server_peer.ip = local_interface->ip;
 
 	elix_networksocket server_socket;
-	elix_networksocket_create(&server_socket, 1, &server_peer, true);
+	elix_networksocket_create(&server_socket, 1, &server_peer, {true, true, false} );
 	
-	PRINT("Listening %d.%d.%d.%d:%d", server_peer.ip.ip4.octel[0], server_peer.ip.ip4.octel[1], server_peer.ip.ip4.octel[2], server_peer.ip.ip4.octel[3], server_peer.port);
+	LOG_PRINT("Listening %d.%d.%d.%d:%d", server_peer.ip.ip4.octel[0], server_peer.ip.ip4.octel[1], server_peer.ip.ip4.octel[2], server_peer.ip.ip4.octel[3], server_peer.port);
 
 	elix_allocated_buffer buffer = {{0}, ELIX_ALLOCATED_BUFFER_SIZE,0};
 	elix_network_peer remote_peer = {};
 
-	PRINT("Waiting for client to connect...");
+	LOG_PRINT("Waiting for client to connect...");
+	signal(SIGINT, programSignalHandler);
+	signal(SIGTERM, programSignalHandler);
+	signal(SIGHUP, programSignalHandler);
+
 	while (http_active) {
-		if ( elix_networksocket_listen_for_message(&server_socket, &remote_peer) ) {
-			if ( elix_networksocket_receive_message(&server_socket, &buffer, &remote_peer) > 0 ) {
+		if ( RESULTS_SUCCESS == elix_networksocket_listen_for_message(&server_socket, &remote_peer) ) {
+			if ( RESULTS_SUCCESS == elix_networksocket_receive_message(&server_socket, &buffer, &remote_peer, false) > 0 ) {
 				elix_http_request request = {0};
-				PRINT("Receive from %d.%d.%d.%d", remote_peer.ip.ip4.octel[0], remote_peer.ip.ip4.octel[1], remote_peer.ip.ip4.octel[2], remote_peer.ip.ip4.octel[3]);
+				LOG_PRINT("Receive from %d.%d.%d.%d", remote_peer.ip.ip4.octel[0], remote_peer.ip.ip4.octel[1], remote_peer.ip.ip4.octel[2], remote_peer.ip.ip4.octel[3]);
 
 				request = elix_http_request_parse(&buffer, false, false);
 
-				PRINT("Requesting %s", request.uri);
+				LOG_PRINT("Requesting %s", request.uri);
 
 				http_handle_request(&request, &server_socket, &remote_peer);
 				
 				elix_networktsocket_close_peer(&remote_peer);
 			}
-			PRINT("Waiting for client to connect...");
+			LOG_PRINT("Waiting for client to connect...");
 		}
 	}
 
@@ -375,6 +380,22 @@ function_results http_server_loop(uint16_t listening_port) {
 int main(int argc, char *argv[]) {
 	//e h s
 	//2 8 19
-	http_server_loop(2819);
+
+	uint16_t port = 2819;
+	int option_index = 0;
+
+	while (( option_index = getopt(argc, argv, ":p")) != -1){
+		switch (option_index) {
+			case 'p':
+				LOG_PRINT("Port %s", optarg);
+			break;
+			default:
+				break;
+		}
+	}
+
+
+
+	http_server_loop(port);
 	return 0;
 }

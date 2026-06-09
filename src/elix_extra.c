@@ -14,7 +14,7 @@
  3. This notice may not be removed or altered from any source distribution.
 ***********************************************************************************************************************/
 #include "elix_extra.h"
-
+#include "elix_parse.h"
 
 void elix_ucstring_copy( const unsigned char * source_init, char * dest_init, size_t dest_size) {
 	unsigned char * source = (unsigned char *)source_init;
@@ -25,6 +25,57 @@ void elix_ucstring_copy( const unsigned char * source_init, char * dest_init, si
 	} while( dest_size && *source != 0);
 	*dest = '\0';
 }
+
+
+elix_http_response elix_http_response_parse(elix_string * incoming, size_t * body_offset ) {
+	elix_http_response response = {0};
+	size_t header_position = 0, header_line_end = 0;
+	size_t header_size = elix_cstring_find_of((char *)incoming->data, "\r\n\r\n", 3);
+	uint8_t headers_count = 0;
+	char * headers[32] = {0};
+	char * text_buffer = (char *)incoming->data;
+
+
+	if ( header_size == SIZE_MAX ) {
+		LOG_ERROR("No headers found");
+		return response;
+	}
+
+	if ( body_offset ) { 
+		*body_offset = header_size;
+	}
+
+	while ( header_position < header_size ) {
+		header_line_end = elix_cstring_find_of(text_buffer, "\r\n", 2);
+
+		if ( header_line_end < header_size) {
+			text_buffer[header_line_end] = 0;
+			if ( headers_count < 32 ) {
+				headers[headers_count++] = text_buffer;
+				if ( elix_cstring_has_prefix(text_buffer, "Content-Encoding: ") ) {
+					response.content_encoding = text_buffer + 18;
+				} else if ( elix_cstring_has_prefix(text_buffer, "Date: ") ) {
+					response.date = text_buffer + 6;
+				} else if ( elix_cstring_has_prefix(text_buffer, "ETag: ") ) {
+					response.etag = text_buffer + 6;
+				} else if ( elix_cstring_has_prefix(text_buffer, "Last-Modified: ") ) {
+					response.modified = text_buffer + 15;
+				} else if ( elix_cstring_has_prefix(text_buffer, "Set-Cookie: ") ) {
+					response.cookie = text_buffer + 12;
+				} else if ( elix_cstring_has_prefix(text_buffer, "Content-Length: ") ) {
+					response.length = text_buffer + 16;
+				}
+			}
+			header_line_end += 2; //Skip \r\n
+			text_buffer += header_line_end;
+			header_size -= header_line_end;
+		}
+		header_position = header_line_end;
+	}
+	return response;
+}
+
+
 
 elix_http_request elix_http_request_parse(elix_allocated_buffer * buffer, bool header_copy, bool body_copy) {
 	elix_http_request request = {0};

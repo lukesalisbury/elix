@@ -1,10 +1,10 @@
 #include "elix_parse.h"
 
 elix_string elix_string_new(uint16_t allocate) {
-    elix_string str = {};
+    elix_string str = {0};
 
     if ( allocate ) {
-        str.text = ALLOCATE(uint8_t, allocate);
+        str.data = ALLOCATE(uint8_t, allocate);
         str.allocated = allocate;
 		str.owned = 1;
     }
@@ -13,24 +13,45 @@ elix_string elix_string_new(uint16_t allocate) {
 
 void elix_string_clear(elix_string * str) {
 	if ( str->owned ) {
-		memset(str->text, 0, str->allocated);
+		memset(str->data, 0, str->allocated);
 		str->length = 0;
 	}
 }
 
-void elix_string_append_byte(elix_string * str, uint8_t byte ) {
+void elix_string_append_data(elix_string * str, uint8_t * data, uint16_t data_size ) {
 	//resize string
-	if ( str->length >= str->allocated - 1 ) {
-		void * newptr = realloc(str->text, str->allocated + 8 );
+	if ( str->length + data_size >= str->allocated - 1 ) {
+		void * newptr = realloc(str->data, str->length + data_size + 8 );
 		if ( !newptr ) {
 			LOG_ERROR("String couldn't be resized");
 			return;
 		}
-		str->text = (uint8_t*)newptr;
+		str->data = (uint8_t*)newptr;
+		str->allocated = str->length + data_size + 8;
+	}
+
+	if ( str->location >= str->allocated - 1 ) {
+		ASSERT("Invaild String location");
+	}
+
+	memcpy(str->data + str->length, data, data_size);
+	str->length += data_size;
+	str->location += data_size;
+
+}
+void elix_string_append_byte(elix_string * str, uint8_t byte ) {
+	//resize string
+	if ( str->length >= str->allocated - 1 ) {
+		void * newptr = realloc(str->data, str->allocated + 8 );
+		if ( !newptr ) {
+			LOG_ERROR("String couldn't be resized");
+			return;
+		}
+		str->data = (uint8_t*)newptr;
 		str->allocated += 8;
 	}
 
-	str->text[str->length] = byte;
+	str->data[str->length] = byte;
 	str->length++;
 }
 
@@ -68,12 +89,39 @@ void elix_string_append(elix_string * str, uint32_t char32 ) {
 	}
 }
 
+elix_string_buffer elix_string_buffer_new(const char * string, size_t buffer_size) {
+    elix_string_buffer str = {0};
+	if ( buffer_size >= __UINT16_MAX__ || string == nullptr || buffer_size == 0) {
+		///TODO: Handle long text
+		return str;
+	}
+
+    str.string.allocated = buffer_size + 1;
+    str.string.data = ALLOCATE(uint8_t, str.string.allocated);
+
+	if (string) {
+		const char *counter = string;
+		while(*counter++) {
+			++ str.string.length;
+		}
+		memcpy(str.string.data, string, str.string.length);
+		
+	}
+	
+	str.string.location = 0;
+
+	str.iter = str.string.data;
+
+    return str;
+}
+
+
 uint32_t elix_string_buffer_forward( elix_string_buffer * str, uint32_t count ) {
-	str->location += count;
+	str->string.location += count;
 	if ( str->iter ) {
 		str->iter += count;
 	} else {
-		str->iter = str->data + str->location;
+		str->iter = str->string.data + str->string.location;
 	}
 	return count;
 }
@@ -83,12 +131,12 @@ uint32_t elix_string_buffer_forward( elix_string_buffer * str, uint32_t count ) 
 elix_string_pointer elix_string_buffer_get_pointer( elix_string_buffer * buffer, size_t offset, size_t length ) {
     elix_string_pointer str;
 
-	if ( offset + length >= buffer->length ) {
+	if ( offset + length >= buffer->string.length ) {
 		return str;
 	}
 
 	str.source = buffer;
-	str.string = buffer->data + offset;
+	str.string = buffer->string.data + offset;
 	str.offset = offset;
 	str.length = length;
 

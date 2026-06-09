@@ -67,7 +67,6 @@ char * elix_cstring_from( const char * source, const char * default_str, size_t 
 
 void elix_cstring_copy( const char * source_init, char * dest_init, size_t max_length);
 
-
 void elix_cstring_char_replace( char * str, const char search, const char replace);
 size_t elix_cstring_append( char * str, const size_t len, const char * text, const size_t text_len);
 

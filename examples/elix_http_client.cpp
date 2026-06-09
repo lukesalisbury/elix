@@ -22,15 +22,6 @@ const uint8_t simple_request_get[] = "GET / HTTP/1.1\r\nHost: %s\r\nAccept: */*\
 uint32_t http_active = 1;
 remote_response_info remote_response = {0};
 
-/*
-User-Agent: 
-Accept-Language:
-Referer:
-Cookie:
-*/
-
-
-
 
 void programSignalHandler(int signal) {
 	http_active = 0;
@@ -38,60 +29,66 @@ void programSignalHandler(int signal) {
 }
 
 
-static inline elix_network_peer elix_network_ip_address_raw(struct sockaddr * peer) {
-	elix_network_peer output = {0};
+#include "elix_html.h"
 
-	///TODO: Do proper fix, for endiness 
-	elix_memcopy_flipped(&output.port, &peer->sa_data[0], 2);
-	if ( peer->sa_family == AF_INET ) {
-		elix_memcopy(&output.ip.ip4.ip, &peer->sa_data[2], 4);
+extern "C" elix_html_document * elix_html_new( elix_string_buffer * content);
 
-	} else if ( peer->sa_family == AF_INET6 ) {
-		LOG_ERROR("elix_network_ip_address_raw doesn't support IPv6 yet");
-		//struct sockaddr_in6 * addr = (struct sockaddr_in6 *)peer;
-		//elix_memcopy(&output.ip.ip6.word, &addr->sin6_addr, 128);
-	}
-	
-	return output;
-}
-
-elix_network_peer elix_network_address_info( const char * domain, const char * port ) {
-	elix_network_peer peer = {0};
-	struct addrinfo * address = nullptr;
-	int results = getaddrinfo(domain,port, nullptr, &address);
-
-	
-	if ( address ) {
-		peer = elix_network_ip_address_raw(address->ai_addr);
-		freeaddrinfo(address);
-	}
-
-	return peer;
-}
-
-#ifdef __cplusplus
-extern "C" {
-uint8_t elix_networksocket_response_message(elix_networksocket * networksocket, elix_allocated_buffer * buffer );
-}
-#endif
 int main(int argc, char *argv[]) {
+
+	int option_index = 0;
+
+	while (( option_index = getopt(argc, argv, ":u")) != -1){
+	    switch (option_index) {
+			case 'u':
+				LOG_PRINT("Port %s", optarg);
+			break;
+			default:
+				break;
+		}
+	}
+
 	elix_network_init();
 
 	elix_network_peer remote_peer = {0};
 	elix_network_peer target_peer = elix_network_address_info("google.com", "80");
 	elix_allocated_buffer buffer = {{0}, ELIX_ALLOCATED_BUFFER_SIZE,0};
 
+
+	elix_string_buffer html_doc = {0};
+
+	html_doc.string = elix_string_new(8196);
+
 	target_peer.ip.ip4.ip = 17868992;
 
 	elix_networksocket client_socket;
-	elix_networksocket_create(&client_socket, TCP, &target_peer, false);
+	elix_networksocket_create(&client_socket, TCP, &target_peer, {false, false, false} );
 
 	uint8_t request[73] = "GET / HTTP/1.1\r\nHost: 192.168.16.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
 
-	elix_networksocket_send_message(&client_socket, &target_peer, request, 73);
-	while ( elix_networksocket_response_message(&client_socket, &buffer) ) {
-		LOG_INFO("%s", buffer.data);
+	if ( RESULTS_SUCCESS == elix_networksocket_send_message(&client_socket, &target_peer, request, 73) ) {
+		while ( RESULTS_SUCCESS == elix_networksocket_receive_message(&client_socket, &buffer, &target_peer, false) ) {
+			LOG_INFO("[Recieved] %s", buffer.data);
+
+			elix_string_append_data(&html_doc.string, buffer.data, buffer.actual_size);
+
+		}
 	}
+
+	LOG_INFO("-------------------------------------------------");
+	LOG_INFO("%.*s", html_doc.string.length, html_doc.string.data);
+	LOG_INFO("-------------- [Header] -------------------");
+	elix_parse_status html_doc_status = {0, SIZE_MAX}; //
+	elix_http_response responmse = elix_http_response_parse(&html_doc.string, &html_doc_status.offset );
+	LOG_INFO("Date: %s", responmse.date);
+	LOG_INFO("Last-Modified: %s", responmse.modified);
+	LOG_INFO("Length: %s", responmse.length);
+
+	LOG_INFO("------------- [Document] ------------------");
+	elix_html_document * doc = elix_html_new(&html_doc);
+	elix_html_parse(doc, &html_doc_status);
+	elix_html_print(doc);
+
+	LOG_INFO("-------------------------------------------------");
 
 	elix_networksocket_destroy(&client_socket);
 

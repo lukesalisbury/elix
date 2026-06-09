@@ -128,20 +128,7 @@ function_results test_elix_rendertree() {
 	return RESULTS_UNKNOWN;
 }
 */
-elix_string_buffer elix_string_buffer_new(const char * string, size_t length) {
-    elix_string_buffer str;
-	if ( length >= __UINT16_MAX__ || string == nullptr || length == 0) {
-		///TODO: Handle long text
-		return str;
-	}
-    str.length = elix_cstring_length_stupid_c(string);
-    str.allocated = length + 1;
-    str.data = (uint8_t*)calloc(1, str.allocated);
-	memcpy(str.data, string, str.length);
-	str.iter = str.data;
-	str.location = 0;
-    return str;
-}
+
 
 const char * test_elix_html_string = R"TEXT(<!DOCTYPE html><html>
 	<!-- Commement --><body>Hello <![CDATA[ sdaghkl
@@ -150,23 +137,16 @@ const char * test_elix_html_string = R"TEXT(<!DOCTYPE html><html>
 function_results test_elix_html() {
 	elix_string_buffer test_html = elix_string_buffer_new(test_elix_html_string, 512);
 	LOG_INDENT("Source", "");
-	LOG_INDENT("%*s", test_html.length, test_html.data);
-
-	size_t before,  after;
-	before = elix_os_memory_usage();
+	LOG_INDENT("%.*s", test_html.string.length, test_html.string.data);
 
 	elix_html_document * html = elix_html_open(&test_html);
 
 	LOG_INDENT("Parsed", "");
 	elix_html_print(html);
-
 	elix_html_close(html);
-
-	after = elix_os_memory_usage();
 
 	NULLIFY(html);
 
-	LOG_INDENT("Memory Usage: Before: " pZU ", After: " pZU ", Diff: " pZU, before, after, after - before);
 
 	return RESULTS_UNKNOWN;
 }
@@ -176,7 +156,6 @@ function_results test_elix_html_window() {
 	elix_string_buffer test_html = elix_string_buffer_new(test_elix_html_string, 512);
 
 	elix_html_document * html = elix_html_open(&test_html);
-
 
 	elix_os_window * w = elix_os_window_create({{600, 500}}, {1,1});
 

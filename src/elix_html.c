@@ -201,7 +201,7 @@ elix_html_node elix_html_node_push_text(elix_html_node current_node, elix_html_d
 
 elix_html_node elix_html_node_push_element(elix_html_node current_node, elix_html_document * doc, elix_string * buffer) {
 	elix_html_node next_node = elix_html_node_push(current_node, ELEMENT_NORMAL, doc);
-	memcpy(next_node->name, buffer->text, 16);
+	memcpy(next_node->name, buffer->data, 16);
 
 	return next_node;
 }
@@ -250,9 +250,9 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 	elix_html_node current_node = nullptr;
 	elix_parse_status current = {};
 
-	current.length = doc->reference->length;
+	current.length = doc->reference->string.length;
 	if ( lastStatus != nullptr ) {
-		//TODO: Continue parsing from a point
+		///TODO: Continue parsing from a point
 		if ( lastStatus->offset > current.length ) {
 			//Pasted the end of file
 			return current;
@@ -260,6 +260,11 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 		if ( lastStatus->length > current.length ) {
 			//File Changed
 		}
+		if ( lastStatus->length == SIZE_MAX ) {
+			//Skip some text
+			current.offset = lastStatus->offset;
+		}
+
 	}
 
 	if ( current.length < 5 ) {
@@ -272,7 +277,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 	elix_character char32;
 
     //Set up pointer to current character
-    doc->reference->iter = doc->reference->data + current.offset;
+    doc->reference->iter = doc->reference->string.data + current.offset;
 
 	int d = 0;
 	size_t text_length = 0;
@@ -523,7 +528,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 						elix_html_attrlist_push(&current_node->attribute, new_attribute);
 						current_node->attributeCount++;
 						if ( debug )
-							printf("[=] name:'%.*s' %s\n", new_attribute->name.length, new_attribute->name.string, buffer.text);
+							printf("[=] name:'%.*s' %s\n", new_attribute->name.length, new_attribute->name.string, buffer.data);
 						elix_string_clear(&buffer);
 						state = STATECHANGE(PARSE_ATTRIBUTE, d);
 					} else {
@@ -544,7 +549,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 							//Buffer contains quotes, so we change buffer length by 2
 							new_attribute->value = elix_string_buffer_get_pointer(doc->reference, current.offset - buffer.length + 1, buffer.length - 1);
 							if (debug)
-								printf("[+] value:'%.*s' %s\n", (int)new_attribute->value.length, new_attribute->value.string, buffer.text);
+								printf("[+] value:'%.*s' %s\n", (int)new_attribute->value.length, new_attribute->value.string, buffer.data);
 							elix_string_clear(&buffer);
 							state = STATECHANGE(PARSE_ATTRIBUTE_KEY, d);
 						} else if ( buffer.length ) {
@@ -592,17 +597,26 @@ elix_html_document * elix_html_open( elix_string_buffer * content) {
 
 	size_t first_character = 0;
 
-	while ( first_character < content->length && isWhiteSpace(content->data[first_character]) ) {
+	while ( first_character < content->string.length && isWhiteSpace(content->string.data[first_character]) ) {
 	    first_character++;
 	}
 
-    if ( content->data[first_character] == '<' ) {
+    if ( content->string.data[first_character] == '<' ) {
         ///NOTE: Reference may be freed elsewhere
 		doc->reference = content;
 	} else {
 		LOG_ERROR("Error: HTML pages must start <");
 	}
 	elix_html_parse(doc, &status);
+	return doc;
+}
+
+elix_html_document * elix_html_new( elix_string_buffer * content) {
+	elix_parse_status status = {};
+	elix_html_document * doc = ALLOCATE(elix_html_document, 1);
+	doc->root = ALLOCATE(elix_html_node_object, 1);
+    
+	doc->reference = content;     ///NOTE: Reference may be freed elsewhere
 	return doc;
 }
 
@@ -691,16 +705,16 @@ void elix_html_print(elix_html_document * doc) {
 
 	if (doc->root) {
 		//Replace newlines with Next Line. This function is use for testing parse results
-		for (uint32_t c = 0; c < doc->reference->length; c++) {
-			if ( doc->reference->data[c] == '\n' )
-				doc->reference->data[c]  = 133;
+		for (uint32_t c = 0; c < doc->reference->string.length; c++) {
+			if ( doc->reference->string.data[c] == '\n' )
+				doc->reference->string.data[c]  = 133;
 		}
 
 		elix_html_printNode(doc->root, d);
 
-		for (uint32_t c = 0; c < doc->reference->length; c++) {
-			if ( doc->reference->data[c] == 133 )
-				doc->reference->data[c] = '\n';
+		for (uint32_t c = 0; c < doc->reference->string.length; c++) {
+			if ( doc->reference->string.data[c] == 133 )
+				doc->reference->string.data[c] = '\n';
 		}
 
 	} else {

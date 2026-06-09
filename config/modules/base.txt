@@ -1,6 +1,7 @@
 #example_window
 #filetransfer
 #test
-#elix_http_client
-#elix_http_server
+#client_http
+//#https_client
+#server_http
 //#pixel_edit

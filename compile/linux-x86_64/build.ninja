@@ -1,9 +1,9 @@
 ninja_required_version = 1.3
 builddir=compile/linux-x86_64/log
-compiler_lib = -lstdc++ -lm -lpthread -lwayland-client -ldbus-1 -lSDL2 -ldbus-1 -lSDL2 
+compiler_lib = -lstdc++ -lm -lpthread -lwayland-client -ldbus-1 -lSDL2 -ldbus-1 -lSDL3 
 compiler_lib_flags = -ggdb3  
 compiler_linker_flags = -Wl,-rpath -Wl,\$$ORIGIN/lib 
-compiler_flags = -ggdb3 -I/usr/include/dbus-1.0 -I/usr/lib/dbus-1.0/include -I/usr/include/SDL2 -D_GNU_SOURCE=1 -D_REENTRANT 
+compiler_flags = -ggdb3 -I/usr/include/dbus-1.0 -I/usr/lib/dbus-1.0/include  
 compiler_includes = -Isrc -Iinclude -I/usr/lib64/dbus-1.0/include/ -I/usr/lib/x86_64-linux-gnu/dbus-1.0/include/ -I/usr/include/dbus-1.0/ 
 compller_defines = -D_DEBUG -DPLATFORM_LINUX -D_GNU_SOURCE=1 -DPLATFORM_BITS=64 
 compiler_mode = debug
@@ -87,15 +87,15 @@ build ${object_dir}/test.o: compile_cpp examples/test.cpp
 
 build test${binary_suffix}${program_suffix}: link ${object_dir}/test.o ${object_dir}elix${binary_suffix}${static_suffix} 
 
-#Module: elix_http_client [0]
+#Module: client_http [0]
 build ${object_dir}/elix_http_client.o: compile_cpp examples/elix_http_client.cpp
 
-build elix_http_client${binary_suffix}${program_suffix}: link ${object_dir}/elix_http_client.o ${object_dir}elix${binary_suffix}${static_suffix} 
+build client_http${binary_suffix}${program_suffix}: link ${object_dir}/elix_http_client.o ${object_dir}elix${binary_suffix}${static_suffix} 
 
-#Module: elix_http_server [0]
+#Module: server_http [0]
 build ${object_dir}/elix_http_server.o: compile_cpp examples/elix_http_server.cpp
 
-build elix_http_server${binary_suffix}${program_suffix}: link ${object_dir}/elix_http_server.o ${object_dir}elix${binary_suffix}${static_suffix} 
+build server_http${binary_suffix}${program_suffix}: link ${object_dir}/elix_http_server.o ${object_dir}elix${binary_suffix}${static_suffix} 
 
 #Module: elix [2]
 build ${object_dir}/src/elix_html_rendertree.o: compile_c ./src/elix_html_rendertree.c
@@ -129,4 +129,4 @@ build ${object_dir}/elix${binary_suffix}${static_suffix}: phony elix${binary_suf
 
 
 ####################################
-default example_window${binary_suffix}${program_suffix} filetransfer${binary_suffix}${program_suffix} test${binary_suffix}${program_suffix} elix_http_client${binary_suffix}${program_suffix} elix_http_server${binary_suffix}${program_suffix} elix${binary_suffix}${static_suffix} 
+default example_window${binary_suffix}${program_suffix} filetransfer${binary_suffix}${program_suffix} test${binary_suffix}${program_suffix} client_http${binary_suffix}${program_suffix} server_http${binary_suffix}${program_suffix} elix${binary_suffix}${static_suffix} 

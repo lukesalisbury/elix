@@ -54,14 +54,16 @@ inline size_t elix_cstring_length(const uint8_t * string, uint8_t include_termin
 
 class elix_filetranfer_peer_list {
 public:
-	elix_network_peer peers[8] = {};
+	elix_network_peer peers[8] = {0};
 	char peers_names[8][16] = {{}};
 	uint8_t counter = 0;
 	uint8_t add( elix_network_peer peer) {
-		for ( uint8_t c; c < 8; c++) {
+		for (uint8_t c = 0; c < 8; c++) {
 			if (!peers[c].ip.raw[1]) {
 				peers[c] = peer;
 				return c;
+			} else {
+				LOG_ERROR("No more Peers can be added");
 			}
 		}
 		return 0xFF;
@@ -94,34 +96,35 @@ bool elix_filetransfer_close(elix_networksocket &socket) {
 bool elix_filetransfer_listenudp(elix_filetranfer_peer_list & peers, elix_networksocket &socket) {
 	elix_allocated_buffer buffer;
 	elix_network_peer remote_peer = {};
-	if ( elix_networksocket_receive_message(&socket, &buffer, &remote_peer) ) {
+	if ( RESULTS_SUCCESS == elix_networksocket_receive_message(&socket, &buffer, &remote_peer, true) ) {
 		
 		LOG_INFO( "Receive from %d.%d.%d.%d via %d", +remote_peer.ip.ip4.octel[0], +remote_peer.ip.ip4.octel[1], +remote_peer.ip.ip4.octel[2], +remote_peer.ip.ip4.octel[3], socket.socket_type);
-		LOG_INFO( "Size: %u - %s", buffer.actual_size, buffer.data);
+		LOG_INFO( "Size: %u - %.*s", buffer.actual_size, buffer.actual_size, buffer.data);
 		
 		switch (buffer.data[0]) {
 			case 0x01: {
-				//std::cout << "Hello MSG Broadcast" << std::endl;
+				LOG_PRINT("Hello MSG Broadcast");
 				uint8_t broadcast_hello[] = "\2TestBot at this address (CLI)";
 				elix_networksocket_send_message(&socket, &remote_peer, broadcast_hello, 31);
 				break;
 			}
 			case 0x02: {
-				//std::cout << "Hello MSG Unicast" << std::endl;
+				LOG_PRINT("Hello MSG Unicast");
 				peers.add(remote_peer);
+
 				break;
 			}
 			case 0x03: {
-				//std::cout << "Good Bye MSG" << std::endl;
+				LOG_PRINT("Good Bye MSG");
 				peers.remove(remote_peer);
 				break;
 			}
 			case 0x04: {
-				//std::cout << "Hello MSG with port Broadcast" << std::endl;
+				LOG_PRINT("Hello MSG with port Broadcast");
 				break;
 			}
 			case 0x05: {
-				//std::cout << "Hello MSG  with port Unicast" << std::endl;
+				LOG_PRINT("Hello MSG  with port Unicast");
 				break;
 			}
 		}
@@ -138,7 +141,7 @@ bool elix_filetransfer_recieveviadukto(elix_networksocket & socket, elix_network
 	// int64 - data size
 	// data
 	static uint8_t dukto_clipboard[] = "___DUKTO___TEXT___";
-	elix_allocated_buffer buffer;
+	elix_allocated_buffer buffer = {{0}, ELIX_ALLOCATED_BUFFER_SIZE,0};
 
 	int64_t data_size = 0;
 	int64_t file_size = 0;
@@ -147,7 +150,7 @@ bool elix_filetransfer_recieveviadukto(elix_networksocket & socket, elix_network
 	uint8_t state = 0;
 	bool reading_loop = 0;
 	char filename[FILENAME_MAX] = {};
-	while ( elix_networksocket_receive_message(&socket, &buffer, &peer) > 0 ) {
+	while ( RESULTS_SUCCESS == elix_networksocket_receive_message(&socket, &buffer, &peer, false) ) {
 		uint8_t * buffer_read = buffer.data;
 		size_t filename_offset = 0;
 		size_t buffer_offset = 0;
@@ -156,14 +159,14 @@ bool elix_filetransfer_recieveviadukto(elix_networksocket & socket, elix_network
 		while (buffer_offset < buffer.actual_size ) {
 			switch (state) {
 				case 0: //Entity Count
-					buffer_offset += elix_memcopy(&entities, buffer_read, sizeof(int64_t));
+					buffer_offset += elix_mem_copy(&entities, buffer_read, sizeof(int64_t));
 					if ( buffer_offset < buffer.actual_size ) {
 						buffer_read =  buffer.data + buffer_offset;
 					}
 					state = 1;
 				break;
 			case 1: //Entity Count
-				buffer_offset += elix_memcopy(&data_size, buffer_read, sizeof(int64_t));
+				buffer_offset += elix_mem_copy(&data_size, buffer_read, sizeof(int64_t));
 				if ( buffer_offset < buffer.actual_size ) {
 					buffer_read =  buffer.data + buffer_offset;
 				}
@@ -185,7 +188,7 @@ bool elix_filetransfer_recieveviadukto(elix_networksocket & socket, elix_network
 				state = 3;
 			break;
 			case 3: //file size
-				buffer_offset += elix_memcopy(&file_size, buffer_read, sizeof(int64_t));
+				buffer_offset += elix_mem_copy(&file_size, buffer_read, sizeof(int64_t));
 				if ( buffer_offset < buffer.actual_size ) {
 					buffer_read =  buffer.data + buffer_offset;
 				}
@@ -196,7 +199,7 @@ bool elix_filetransfer_recieveviadukto(elix_networksocket & socket, elix_network
 				file_left = buffer.actual_size;
 
 				buffer_read = buffer.data + buffer_offset;
-				if ( elix_compare("___DUKTO___TEXT___", filename, filename_offset)) {
+				if ( elix_mem_compare("___DUKTO___TEXT___", filename, filename_offset)) {
 					elix_window_notification_settings setting = elix_window_notification_settings_create("Incoming Text", "Copy", " Copy Text to Clipboard", (char*)buffer_read);
 					elix_window_notification_message * message = elix_window_notification_add(notify_handler, setting, &write_clipboard, buffer_read);
 					buffer_offset = buffer.actual_size;
@@ -224,7 +227,7 @@ bool elix_filetransfer_listentcp(elix_filetranfer_peer_list & peers, elix_networ
 
 	elix_network_peer remote_peer = {};
 
-	if (elix_networksocket_listen_for_message(&socket, &remote_peer) ) {
+	if (RESULTS_SUCCESS == elix_networksocket_listen_for_message(&socket, &remote_peer)) {
 		///TODO: push to thread
 		elix_filetransfer_recieveviadukto(socket, remote_peer);
 	}
@@ -264,7 +267,7 @@ bool elix_filetransfer_sendviadukto(elix_network_peer & peer, uint8_t * name, ui
 	}
 
 	elix_networksocket tcp_sender;
-	elix_networksocket_create(&tcp_sender, TCP, &peer, false);
+	elix_networksocket_create(&tcp_sender, TCP, &peer, {false, true, false});
 	elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &entities, 8);
 	elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8);
 
@@ -296,23 +299,23 @@ bool elix_filetransfer_sendviadukto(elix_network_peer & peer, uint8_t * name, ui
 	return true;
 }
 
-int main()
+int test_main()
 {
 	elix_networksocket udp, tcp;
 	
 	elix_filetranfer_peer_list peers_list;
 	
-	elix_network_peer broadcast_peer = { {.ip4={.ip=0xFFFFFFFF} }, 4644};
-	elix_network_peer any_peer = { {0x00000000, 0x00000000}, 4644};
-	elix_network_peer test_peer = { {0x00000000, 0x00000000}, 4644};
+	elix_network_peer broadcast_peer = { -1, {.ip4={.ip=0xFFFFFFFF} }, 4644};
+	elix_network_peer any_peer = { -1, {0x00000000, 0x00000000}, 4644};
+	elix_network_peer test_peer = { -1, {0x00000000, 0x00000000}, 4644};
 	test_peer.ip.ip4.ip = 0x6310A8C0;
 
 	//uint8_t broadcast_hello[] = {0x01, 'T', ' ', 'a', 't', ' ', 0};
 	uint8_t broadcast_hello[] = "\1TestBot at address (CLI)";
 	uint8_t broadcast_bye[] = {0x04, 'B', 'y', 'e', ' '};
 
-	elix_networksocket_create(&udp, UDP, &any_peer, true);
-	elix_networksocket_create(&tcp, TCP, &any_peer, true);
+	elix_networksocket_create(&udp, UDP, &any_peer, {true, true, false} );
+	elix_networksocket_create(&tcp, TCP, &any_peer, {true, true, false} );
 	
 	elix_filetransfer_sendviadukto(test_peer, nullptr, (uint8_t*)"Hello world sdaf");
 	elix_filetransfer_sendviadukto(test_peer, (uint8_t*)"genscript.c", nullptr);
@@ -333,7 +336,7 @@ int main()
 
 char blank_string[256] = {'\0'};
 
-int amain(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 	char * arg0 = argv[0];
 
 	notify_incomingfile = elix_window_notification_settings_create("Incoming File", blank_string, "", "");
@@ -341,9 +344,9 @@ int amain(int argc, char *argv[]) {
 	elix_program_info info = elix_program_info_create(arg0, "File Transfer", "0", "0");
 	elix_network_interface * local_interface = elix_network_gather_ip_addresses(true);
 
-	elix_network_peer broadcast_peer = { {.ip4={.ip=0xFFFFFFFF} }, 4644};
-	elix_network_peer any_peer = { {0x00000000, 0x00000000}, 4644};
-	elix_network_peer test_peer = { {0x00000000, 0x00000000}, 4644};
+	elix_network_peer broadcast_peer = { -1, {.ip4={.ip=0xFFFFFFFF} }, 4644};
+	elix_network_peer any_peer = { -1, {0x00000000, 0x00000000}, 4644};
+	elix_network_peer test_peer = { -1, {0x00000000, 0x00000000}, 4644};
 	test_peer.ip.ip4.ip = 0x5110A8C0;
 
 
@@ -360,9 +363,10 @@ int amain(int argc, char *argv[]) {
 
 	elix_networksocket udp, tcp;
 
-	elix_networksocket_create(&udp, UDP, &any_peer, true);
-	elix_networksocket_create(&tcp, TCP, &any_peer, true);
+	elix_networksocket_create(&udp, UDP, &any_peer, {true, true, false} );
+	elix_networksocket_create(&tcp, TCP, &any_peer, {true, true, false} );
 
+	LOG_PRINT("Broadcast Hello");
 	elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, broadcast_hello_size);
 
 	int option_index = 0;
@@ -374,15 +378,15 @@ int amain(int argc, char *argv[]) {
 	    switch (option_index) {
 			case 'f':
 				filename = optarg;
-				LOG_MESSAGE("Sending File: %s", optarg);
+				LOG_PRINT("Sending File: %s", optarg);
 			break;
 			case 'm':
 				message = optarg;
-				LOG_MESSAGE("Sending Message");
+				LOG_PRINT("Sending Message");
 			break;
 		
 			case 'i':
-				LOG_MESSAGE("Sending File: %s", optarg);
+				LOG_PRINT("Sending File: %s", optarg);
 				test_peer.ip.ip4.ip = inet_addr(optarg);
 			break;
 
@@ -391,7 +395,7 @@ int amain(int argc, char *argv[]) {
 			break;
 
 			default:
-				LOG_MESSAGE("No options given, running in listening mode");
+				("No options given, running in listening mode");
 		}
 	}
 
@@ -402,15 +406,15 @@ int amain(int argc, char *argv[]) {
 		elix_filetransfer_sendviadukto(test_peer, (uint8_t*)filename, nullptr);
 	} else if ( list_connections ) {
 		uint8_t trycount = 255;
-		LOG_MESSAGE("Looking");
+		LOG_PRINT("Looking");
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		while ( trycount-- ) {
 			elix_filetransfer_listen(peers_list, udp);
 			std::this_thread::sleep_for(std::chrono::microseconds(1));
 		}
 
-		for (uint8_t i = 0; i < peers_list.counter; i++) {
-			LOG_MESSAGE("[%d] %s", i, peers_list.peers_names[i]);
+		for (auto &&peer : peers_list.peers) {
+			LOG_PRINT("[] %d.%d.%d.%d", peer.ip.ip4.octel[0], peer.ip.ip4.octel[1], peer.ip.ip4.octel[2], peer.ip.ip4.octel[3]);
 		}	
 	} else {
 

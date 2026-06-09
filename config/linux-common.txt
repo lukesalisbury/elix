@@ -19,4 +19,4 @@ _GNU_SOURCE=1
 -Wl,-rpath -Wl,\$$ORIGIN/lib
 [pkg-linux]
 dbus-1
-sdl2
+sdl3

@@ -1477,6 +1477,8 @@ uint8_t parse_filelist( const char * module, ConfigList * files, ConfigList * mo
 			
 			//LOG_INFO("%d %s", link_objects->current, link_objects->value[link_objects->current]);
 			link_objects->current++;
+		} else if ( elix_cstring_has_prefix(data, "[") ) {
+			LOG_INFO("Module Option: '%s' - '%s'", module, data);
 		} else if ( elix_cstring_has_prefix(data, "//") ) {
 			
 		} else if ( elix_cstring_has_prefix(data, "$shared") ) {

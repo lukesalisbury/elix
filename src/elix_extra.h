@@ -22,6 +22,8 @@
 #include "elix_os.h"
 #include "elix_networksocket.h"
 
+#include "elix_parse.h"
+
 typedef struct elix_http_request {
 	char * headers_buffer;
 	char * body_buffer;
@@ -37,6 +39,23 @@ typedef struct elix_http_request {
 
 } elix_http_request;
 
+typedef struct elix_http_response {
+	char * headers_buffer;
+	char * body_buffer;
+	size_t headers_buffer_size;
+	size_t body_buffer_size;
+
+	char * date;
+	char * etag;
+	char * content_type;
+	char * modified;
+	char * content_encoding;
+	char * cookie;
+	char * length;
+
+} elix_http_response;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,6 +63,7 @@ extern "C" {
 void elix_ucstring_copy( const unsigned char * source_init, char * dest_init, size_t dest_size);
 
 elix_http_request elix_http_request_parse(elix_allocated_buffer * buffer, bool header_copy, bool body_copy);
+elix_http_response elix_http_response_parse(elix_string * incoming, size_t * body_offset );
 
 int64_t elix_cstring_convert_to_int(const char * str);
 
