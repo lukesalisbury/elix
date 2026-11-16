@@ -19,16 +19,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-
 #if defined PLATFORM_WINDOWS
-
 	//#include "elix_os_directory_win.cpp"
 	//#include "elix_os_win.cpp"
 #elif defined PLATFORM_LINUX
 	#define ELIX_USE_DIRECTORY_POSIX 1
 	//#include "elix_os_directory_posix.cpp"
 	//#include "elix_os_linux.cpp"
-	
 #elif defined PLATFORM_3DS
 	//#include "elix_os_directory_posix.cpp"
 	#define ELIX_USE_DIRECTORY_POSIX 1
@@ -42,42 +39,8 @@
 	#error "Unsupported platform"
 #endif
 
-
-
-/*
-elix_path elix_path_create(const char * string) {
-	elix_path uri = { nullptr, nullptr, nullptr, nullptr};
-	
-	size_t length = elix_cstring_length(string, 0);
-	size_t split = SIZE_MAX;
-	size_t extension_split = SIZE_MAX;
-	for (split = length-1; split > 0; split--) {
-		if ( string[split] == '\\' || string[split] == '/') {
-			split++;
-			break;
-		}
-		if ( extension_split == SIZE_MAX && string[split] == '.') {
-			extension_split = split;
-		}
-	}
-
-	uri.uri = elix_cstring_from( string );
-	uri.buffer = elix_cstring_from( string );
-	uri.path = uri.buffer + split;
-
-#ifdef PLATFORM_WINDOWS
-	elix_cstring_char_replace(uri.buffer, '\\', '/');
-#endif
-	if ( extension_split != SIZE_MAX && extension_split != split ) {
-		uri.filename = elix_cstring_from(string + split, "/", extension_split - split + 1);
-		uri.filetype = elix_cstring_from(string + extension_split, "/",SIZE_MAX);
-	} else {
-		uri.filename = elix_cstring_from(string + split, "/", length - split+1);
-		uri.filetype = nullptr;
-	}
-	return uri;
-}
-*/
+/* elix_program_directory__special_get is stored in elix_os_directory_*.c */
+char * elix_program_directory__special_get(elix_program_special_directory dir_type, const char * folder_name, UNUSEDARG size_t extra_bytes);
 
 elix_path elix_path_create(const char * string) {
 	elix_path uri = { nullptr, nullptr, nullptr, nullptr};
@@ -102,7 +65,7 @@ elix_path elix_path_create(const char * string) {
 	if ( split == 0 ) { // Default if no path found
 		uri.path = elix_cstring_from(nullptr, "./", 2 );
 	} else {
-		uri.path = elix_cstring_from(string, "./", split );
+		uri.path = elix_cstring_from(string, "./", split + 1 );
 	}
 
 #ifdef PLATFORM_WINDOWS
@@ -118,49 +81,51 @@ elix_path elix_path_create(const char * string) {
 	return uri;
 }
 
+void elix_path_destroy(elix_path * path) {
+	if (!path) {
+		return;
+	}
 
-char * elix_program_directory__special_get(ELIX_PROGRAM_DIRECTORY dir_type, const char * folder_name, UNUSEDARG size_t extra_bytes);
+	NULLIFY(path->filename);
+	NULLIFY(path->filetype);
+	NULLIFY(path->path);
+	NULLIFY(path->uri);
+}
 
 
-elix_program_info elix_program_info_create(const char* arg0 , const  char * program_name, const  char * version, const  char * version_level) {
-	elix_program_info info;
+elix_program_info elix_program_info_create(const char * arg0, const char * program_name, const char * version_release, const char * version_directory) {
+	elix_program_info info = {0, .system_user = "Unknown"};
 	ssize_t dir_len = 0;
 
-	elix_cstring_copy("TODO", info.user, 16);
-	// GetUserNameEx(NameDisplay, info.user, nullptr);
-	elix_cstring_copy(getenv("USER"), info.user, 16);
-	info.resource_directory_type = EPRD_AUTO;
-	info.program_name = elix_cstring_from(program_name, "elix_example", 64);
-	info.program_version = elix_cstring_from(version, "Testing", 64);
-	if ( version_level == nullptr ) {
-		info.program_version_level = nullptr;
-		info.program_directory = elix_cstring_from(program_name , "elix_unknown_program", 64);
-	} else {
-		info.program_version_level = elix_cstring_from(version_level, "1", 64);
-		info.program_directory = nullptr;
+	#if ELIX_USE_DIRECTORY_POSIX
+		elix_cstring_copy(getenv("USER"), info.system_user, 15);
+	#else
+		elix_cstring_copy("Windows", info.system_user, 15);
+	#endif
 
-		dir_len = snprintf ( nullptr, 0, "%s-%s", info.program_name, info.program_version_level );
-		if ( dir_len ) {
-			info.program_directory = ALLOCATE(char, dir_len+1);
-			snprintf ( info.program_directory, dir_len, "%s-%s", info.program_name, info.program_version_level );
-		} else {
-			info.program_directory = elix_cstring_from(program_name , "elix_unknown_program", 64);
-		}
+	elix_cstring_copy(program_name, info.program_name, 31);
+	elix_cstring_copy(version_release, info.program_version, 7);
+	elix_cstring_copy(version_directory, info.program_version_directory, 15);
+
+	elix_cstring_append(info.program_directory, 40, info.program_name, 31);
+	
+	if ( version_directory != nullptr ) {
+		elix_cstring_append(info.program_directory, 40, "-", 1);
+		elix_cstring_append(info.program_directory, 40, info.program_version_directory, 7);
 	}
 
 	elix_cstring_sanitise(info.program_directory);
 
 	info.path_executable = elix_path_create(arg0);
 
+	elix_cstring_append(info.program_executable, 40, info.path_executable.filename, elix_cstring_length(info.path_executable.filename, 1) );
+	elix_cstring_sanitise(info.program_executable);
 
 	return info;
 }
 
 
-
-
 extern inline void elix_path__real(char * path, size_t len) {
-
 	size_t from = SIZE_MAX, to = 0, skip_sep = 0;
 	for (size_t c = len; c > 0; c--) {
 		if ( from == SIZE_MAX ) {
@@ -187,153 +152,188 @@ extern inline void elix_path__real(char * path, size_t len) {
 				skip_sep = 0;
 			}
 		}
-
-
 	}
-
 }
 
-
-char * elix_program_directory_documents( const elix_program_info * program_info, bool shared, const char * filename ){
+function_results elix_program_directory_create(const elix_program_info * program_info, elix_program_special_directory directory) {
 	ASSERT(program_info != nullptr);
 
-	size_t extras = 0;
-	size_t name_len = elix_cstring_length(filename, 0);
-	size_t sub_len = elix_cstring_length(program_info->program_directory, 0);
-	char * directory = nullptr;
-
-	directory = elix_program_directory__special_get((shared ? EPDS_DOCS_PUBLIC : EPDS_DOCS_PRIVATE), program_info->program_directory, name_len+sub_len+2);
-	if ( !directory ) {
-		return nullptr;
+	if ( directory < EPSD_USER_CONFIG ) {
+		LOG_ERROR("System directories can not be created");
+		return RESULTS_FAILED;
 	}
 
-	extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-	extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, program_info->program_directory, sub_len);
+	char * requested_folder = elix_program_directory__special_get(directory, program_info->program_directory, 0);
 
-	if ( filename ) {
-		extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-		extras += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
+	if ( !elix_os_directory_is(requested_folder, nullptr) ) {
+		if ( elix_os_directory_make(requested_folder, 744, false, nullptr) ) {
+			return RESULTS_SUCCESS;
+		}
+		return RESULTS_ERROR;
 	}
-
-	if ( !extras ) {
-		NULLIFY(directory);
-		return nullptr;
-	} else {
-		return directory;
-	}
-
+	return RESULTS_ERROR;
 }
 
-char * elix_program_directory_user( const elix_program_info * program_info, bool roaming, const char * filename ) {
-	ASSERT(program_info != nullptr);
+char * elix_program_directory_resource__subset(const elix_program_info * program_info, elix_program_resource_directory special, const char * directory, const char * filename ) {
+	char * requested_path = nullptr;
+	size_t filename_length = elix_cstring_length(filename, 1);
 
-	uint8_t errors = 0;
-	size_t name_len = elix_cstring_length(filename, 0);
-	size_t sub_len = elix_cstring_length(program_info->program_directory, 0);
-	char * directory = nullptr;
-
-	directory = elix_program_directory__special_get((roaming ? EPDS_USER_ROAMING : EPDS_USER_LOCAL), program_info->program_directory, name_len+sub_len+2);
-
-	errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-	errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, program_info->program_directory, sub_len);
-
-	if ( filename ) {
-		errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-		errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
-	}
-
-	if ( errors ) {
-		NULLIFY(directory);
-		return nullptr;
-	} else {
-		return directory;
-	}
-
-}
-
-char * elix_program_directory__resources_get( const elix_program_info * program_info, uint32_t resource_directory_type, size_t name_len) {
-	char * directory = nullptr;
-	size_t dir_len = 0;
-	
-	switch (resource_directory_type) {
-		case EPRD_DATA:
-			dir_len = snprintf( nullptr, 0, "%s/%s_data", program_info->path_executable.path, program_info->path_executable.filename ); 
-			dir_len += name_len + 2;
-			directory = ALLOCATE(char, dir_len);
-			snprintf ( directory, dir_len, "%s/%s_data", program_info->path_executable.path, program_info->path_executable.filename );
-			break;
+	switch (special) {
+		// ../share/"program_name"/
+		case EPRD_PARENT_SHARE_MUTATABLE:
 		case EPRD_PARENT_SHARE:
-			dir_len = snprintf( nullptr, 0, "%s/../share/%s", program_info->path_executable.path, program_info->program_directory );
-			dir_len += name_len + 2;
-			directory = ALLOCATE(char, dir_len);
-			snprintf( directory, dir_len, "%s/../share/%s", program_info->path_executable.path, program_info->program_directory );
-			elix_path__real(directory, dir_len);
+			requested_path = elix_cstring_create(program_info->path_executable.path, ELIX_FILE_PATH_LENGTH);
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, "../share/", 10);
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, directory, elix_cstring_length(directory, 0));
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, "/", 1);
 			break;
+		// ./share/"program_name"/
+		case EPRD_SHARE_MUTATABLE:
 		case EPRD_SHARE:
-			dir_len = snprintf ( nullptr, 0, "%s/share/%s", program_info->path_executable.path, program_info->program_directory );
-			dir_len += name_len + 2;
-			directory = ALLOCATE(char, dir_len);
-			snprintf ( directory, dir_len, "%s/share/%s", program_info->path_executable.path, program_info->program_directory );
+			requested_path = elix_cstring_create(program_info->path_executable.path, ELIX_FILE_PATH_LENGTH);
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, "share/", 8);
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, directory, elix_cstring_length(directory, 0));
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, "/", 1);
 			break;
-		case EPRD_GLOBAL:
-			directory = elix_program_directory__special_get(EPDS_DOCS_PUBLIC, program_info->program_directory, name_len+2);
+		// ./"program_name"_data/
+		case EPRD_DATA_MUTATABLE:
+		case EPRD_DATA:
+			requested_path = elix_cstring_create(program_info->path_executable.path, ELIX_FILE_PATH_LENGTH);
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, directory, elix_cstring_length(directory, 0));
+			elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, "_data/", 7);
+			break;
+		default:
 			break;
 	}
-	return directory;
+	//if ( !elix_os_directory_is(requested_path, nullptr) ) {
+	//	NULLIFY(requested_path);
+	//}
 
+	return requested_path;
 }
 
-
-char * elix_program_directory_resources( const elix_program_info * program_info, const char * filename, uint8_t override_lookup ) {
+char * elix_program_directory_resource( const elix_program_info * program_info, const char * filename, uint8_t always_return, elix_program_resource_directory resource_directory )  {
 	ASSERT(program_info != nullptr);
 
-	uint8_t errors = 0;
-	size_t dir_len = 0, name_len = 0;
-	char * directory = nullptr;
-	uint32_t resource_directory_type = program_info->resource_directory_type;
+	char * requested_path = nullptr;
+	size_t filename_length = elix_cstring_length(filename, 1);
 
-	if ( filename != nullptr ) {
-		name_len = elix_cstring_length(filename,0);
+	switch ( resource_directory ) {
+		case EPRD_AUTO:
+		case EPRD_GLOBAL_SHARE: {
+			requested_path = elix_program_directory__special_get( EPSD_SYSTEM_RESOURCE, program_info->program_directory, filename_length);
+			if ( requested_path != nullptr )
+				break;
+		}
+		case EPRD_LOCAL_SHARE: {
+			requested_path = elix_program_directory__special_get( EPSD_USER_RESOURCE, program_info->program_directory, filename_length);
+			if ( requested_path != nullptr )
+				break;
+		}
+		case EPRD_PARENT_SHARE:
+		case EPRD_SHARE:
+		case EPRD_DATA: {
+			requested_path = elix_program_directory_resource__subset(program_info, resource_directory, program_info->program_directory, filename);
+			if ( requested_path != nullptr )
+				break;
+		}
+		case EPRD_PARENT_SHARE_MUTATABLE:
+		case EPRD_SHARE_MUTATABLE:
+		case EPRD_DATA_MUTATABLE: {
+			requested_path = elix_program_directory_resource__subset(program_info, resource_directory, program_info->path_executable.filename, filename);
+			if ( requested_path != nullptr )
+				break;
+		}
+		default:
+			break;
 	}
 
-	if ( override_lookup != EPRD_AUTO ) {
-		resource_directory_type = override_lookup;
-	}
-
-	if ( resource_directory_type == EPRD_AUTO ){
-		for( uint32_t t = EPRD_SHARE; t <= EPRD_DATA; t++) {
-			directory = elix_program_directory__resources_get( program_info, EPRD_DATA, name_len);
-			dir_len = elix_cstring_length(directory, 0);
-			if (  elix_os_directory_is(directory, nullptr)) {
-				if ( filename != nullptr ) {
-					errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-					errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
-				}
-				return directory;
+	if ( requested_path != nullptr ) {
+		if ( elix_os_directory_is(requested_path, nullptr) || always_return ) {
+			if ( filename ) {
+				elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, filename, filename_length);
 			}
-			NULLIFY(directory)
+			return requested_path;
 		}
-	} else {
-		directory = elix_program_directory__resources_get( program_info, resource_directory_type, name_len);
-		dir_len = elix_cstring_length(directory, 0);
+		NULLIFY(requested_path);
+	}
 
-		if ( filename != nullptr ) {
-			errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-			errors += elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, filename, name_len);
-		}
-		return directory;
+	return requested_path;
+}
 
-		if ( !elix_os_directory_is(directory, nullptr)) {
-			LOG_ERROR("elix_program_directory_resources directory doesn't exist: %s", directory);
+char * elix_program_directory_config( const elix_program_info * program_info, const char * filename, uint8_t always_return, uint8_t system_version ) {
+	ASSERT(program_info != nullptr);
+
+	char * requested_path = nullptr;
+	size_t filename_length = elix_cstring_length(filename, 1);
+
+	elix_program_special_directory special = EPSD_USER_CONFIG;
+	if ( system_version > 0 ) {
+		special = EPSD_SYSTEM_CONFIG;
+	}
+
+	requested_path = elix_program_directory__special_get(special, program_info->program_directory, filename_length);
+	if ( requested_path != nullptr ) {
+		if ( elix_os_directory_is(requested_path, nullptr) || always_return) {
+			if ( filename ) {
+				elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, filename, filename_length);
+			}
+			return requested_path;
 		}
 	}
 
-	LOG_ERROR("elix_program_directory_resources failed due to type failure.");
-	return nullptr;
+	NULLIFY(requested_path);
+	return requested_path;
 }
 
-char * elix_program_directory_cache_file( const elix_program_info * program_info, const char * filename) {
-	return elix_program_directory_user(program_info, true, filename);
+/* Returns path for User Docs. Such as ~/Documents or CSIDL_PERSONAL on Windows */
+char * elix_program_directory_document( const elix_program_info * program_info, const char * filename, uint8_t always_return, uint8_t request_root_directory ) {
+	ASSERT(program_info != nullptr);
+	
+	char * requested_path = nullptr;
+	size_t filename_length = elix_cstring_length(filename, 1);
+
+	if ( request_root_directory ) {
+		requested_path = elix_program_directory__special_get(EPSD_USER_DOCS, nullptr, filename_length);
+	} else {
+		requested_path = elix_program_directory__special_get(EPSD_USER_DOCS, program_info->program_directory, filename_length);
+	}
+	if ( requested_path != nullptr ) {
+		if ( elix_os_directory_is(requested_path, nullptr) || always_return ) {
+			if ( filename ) {
+				elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, filename, filename_length);
+			}
+			return requested_path;
+		}
+	}
+
+	NULLIFY(requested_path);
+	return requested_path;
 }
 
+
+char * elix_program_directory_cache( const elix_program_info * program_info, const char * filename, uint8_t always_return, uint8_t system_version ) {
+	ASSERT(program_info != nullptr);
+	
+	char * requested_path = nullptr;
+	size_t filename_length = elix_cstring_length(filename, 1);
+
+	if ( system_version ) {
+		requested_path = elix_program_directory__special_get(EPSD_USER_TEMP, program_info->program_directory, filename_length);
+	} else {
+		requested_path = elix_program_directory__special_get(EPSD_USER_CACHE, program_info->program_directory, filename_length);
+	}
+
+	if ( requested_path != nullptr ) {
+		if ( elix_os_directory_is(requested_path, nullptr) || always_return ) {
+			if ( filename ) {
+				elix_cstring_append(requested_path, ELIX_FILE_PATH_LENGTH, filename, filename_length);
+			}
+			return requested_path;
+		}
+	}
+
+	NULLIFY(requested_path);
+	return requested_path;
+}
 

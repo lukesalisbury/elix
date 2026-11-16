@@ -285,7 +285,7 @@ void programSignalHandler(int signal) {
 }
 
 function_results http_output_function( const char * string, const void * data ) {
-	elix_networksocket_send_message(remote_response.server_socket, remote_response.remote_peer, (const uint8_t*) string , elix_cstring_length(string,0));
+	elix_networksocket_send_message(remote_response.server_socket, remote_response.remote_peer, (const uint8_t*) string , elix_cstring_length(string,0), nullptr);
 	return RESULTS_SUCCESS;
 }
 
@@ -297,22 +297,22 @@ function_results http_handle_request(elix_http_request * request, elix_networkso
 	remote_response.server_socket = server_socket;
 	remote_response.remote_peer = remote_peer;
 	if ( elix_cstring_has_prefix(request->uri, "/list/") ) {
-		elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46);
+		elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46, nullptr);
 	} else if ( elix_cstring_has_prefix(request->uri, "/update/") ) {
-		elix_networksocket_send_message(server_socket, remote_peer, simple_reply_json, 86);
+		elix_networksocket_send_message(server_socket, remote_peer, simple_reply_json, 86, nullptr);
 	} else if ( elix_cstring_has_prefix(request->uri, "/QUIT/") ) {
 		http_active = 0;
 	} else if ( elix_cstring_has_prefix(request->uri, "/") ) {
 		elix_file file = {0};
 		if ( elix_file_open( &file, "resources/web/server.html", EFF_FILE_READ, nullptr) ) {
-			elix_networksocket_send_message(server_socket, remote_peer, simple_reply_html, 78);
+			elix_networksocket_send_message(server_socket, remote_peer, simple_reply_html, 78, nullptr);
 			while (!elix_file_at_end(&file)) {
 				uint8_t data[256] = {0};
 
 				size_t q = elix_file_read(&file, data, 1, 256);
 				if (q) {
 					LOG_MESSAGE("%s", data);
-					elix_networksocket_send_message(server_socket, remote_peer, data, q);	
+					elix_networksocket_send_message(server_socket, remote_peer, data, q, nullptr);
 				} else {
 					break;
 				}
@@ -320,10 +320,10 @@ function_results http_handle_request(elix_http_request * request, elix_networkso
 			elix_file_close(&file);
 		} else {
 			LOG_MESSAGE("File not found");
-			elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46);
+			elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46, nullptr);
 		}
 	} else {
-		elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46);
+		elix_networksocket_send_message(server_socket, remote_peer, simple_error_reply, 46, nullptr);
 	}
 	return RESULTS_SUCCESS;
 }
@@ -353,7 +353,7 @@ function_results http_server_loop(uint16_t listening_port) {
 
 	while (http_active) {
 		if ( RESULTS_SUCCESS == elix_networksocket_listen_for_message(&server_socket, &remote_peer) ) {
-			if ( RESULTS_SUCCESS == elix_networksocket_receive_message(&server_socket, &buffer, &remote_peer, false) > 0 ) {
+			if ( RESULTS_SUCCESS == elix_networksocket_receive_message(&server_socket, &remote_peer, buffer.data, buffer.data_size, nullptr, false) > 0 ) {
 				elix_http_request request = {0};
 				LOG_PRINT("Receive from %d.%d.%d.%d", remote_peer.ip.ip4.octel[0], remote_peer.ip.ip4.octel[1], remote_peer.ip.ip4.octel[2], remote_peer.ip.ip4.octel[3]);
 

@@ -94,9 +94,9 @@ bool elix_filetransfer_close(elix_networksocket &socket) {
 
 
 bool elix_filetransfer_listenudp(elix_filetranfer_peer_list & peers, elix_networksocket &socket) {
-	elix_allocated_buffer buffer;
+	elix_allocated_buffer buffer = {{0}, ELIX_ALLOCATED_BUFFER_SIZE, 0};
 	elix_network_peer remote_peer = {};
-	if ( RESULTS_SUCCESS == elix_networksocket_receive_message(&socket, &buffer, &remote_peer, true) ) {
+	if ( RESULTS_SUCCESS == elix_networksocket_receive_message(&socket, &remote_peer, buffer.data, buffer.data_size, nullptr, true) ) {
 		
 		LOG_INFO( "Receive from %d.%d.%d.%d via %d", +remote_peer.ip.ip4.octel[0], +remote_peer.ip.ip4.octel[1], +remote_peer.ip.ip4.octel[2], +remote_peer.ip.ip4.octel[3], socket.socket_type);
 		LOG_INFO( "Size: %u - %.*s", buffer.actual_size, buffer.actual_size, buffer.data);
@@ -105,7 +105,7 @@ bool elix_filetransfer_listenudp(elix_filetranfer_peer_list & peers, elix_networ
 			case 0x01: {
 				LOG_PRINT("Hello MSG Broadcast");
 				uint8_t broadcast_hello[] = "\2TestBot at this address (CLI)";
-				elix_networksocket_send_message(&socket, &remote_peer, broadcast_hello, 31);
+				elix_networksocket_send_message(&socket, &remote_peer, broadcast_hello, 31, nullptr);
 				break;
 			}
 			case 0x02: {
@@ -150,7 +150,7 @@ bool elix_filetransfer_recieveviadukto(elix_networksocket & socket, elix_network
 	uint8_t state = 0;
 	bool reading_loop = 0;
 	char filename[FILENAME_MAX] = {};
-	while ( RESULTS_SUCCESS == elix_networksocket_receive_message(&socket, &buffer, &peer, false) ) {
+	while ( RESULTS_SUCCESS == elix_networksocket_receive_message(&socket, &peer, buffer.data, buffer.data_size, nullptr, false) ) {
 		uint8_t * buffer_read = buffer.data;
 		size_t filename_offset = 0;
 		size_t buffer_offset = 0;
@@ -268,13 +268,13 @@ bool elix_filetransfer_sendviadukto(elix_network_peer & peer, uint8_t * name, ui
 
 	elix_networksocket tcp_sender;
 	elix_networksocket_create(&tcp_sender, TCP, &peer, {false, true, false});
-	elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &entities, 8);
-	elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8);
+	elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &entities, 8, nullptr);
+	elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8, nullptr);
 
 	if ( text_message ) {
-		elix_networksocket_send_message(&tcp_sender, &peer, text_message_filename, 19);
-		elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8);
-		elix_networksocket_send_message(&tcp_sender, &peer, text_message, 17);
+		elix_networksocket_send_message(&tcp_sender, &peer, text_message_filename, 19, nullptr);
+		elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8, nullptr);
+		elix_networksocket_send_message(&tcp_sender, &peer, text_message, 17, nullptr);
 	} else {
 		uint8_t * base_name = name;
 		uint8_t * s = (uint8_t*)strrchr((char*)name, '/');
@@ -282,14 +282,14 @@ bool elix_filetransfer_sendviadukto(elix_network_peer & peer, uint8_t * name, ui
 			base_name = (s + 1);
 		}
 		//Read thought file
-		elix_networksocket_send_message(&tcp_sender, &peer, base_name, elix_cstring_length(base_name,1));
-		elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8);
+		elix_networksocket_send_message(&tcp_sender, &peer, base_name, elix_cstring_length(base_name,1), nullptr);
+		elix_networksocket_send_message(&tcp_sender, &peer, (uint8_t*) &data_size, 8, nullptr);
 
 		uint8_t buffer[512] = {};
 		int64_t buffer_size = 0;
 		do {
 			buffer_size = elix_file_read(&input_file, buffer, 1, 512);
-			elix_networksocket_send_message(&tcp_sender, &peer, buffer, buffer_size);
+			elix_networksocket_send_message(&tcp_sender, &peer, buffer, buffer_size, nullptr);
 		} while (!elix_file_at_end(&input_file));
 
 	}
@@ -320,8 +320,8 @@ int test_main()
 	elix_filetransfer_sendviadukto(test_peer, nullptr, (uint8_t*)"Hello world sdaf");
 	elix_filetransfer_sendviadukto(test_peer, (uint8_t*)"genscript.c", nullptr);
 
-	elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, 26);
-	elix_networksocket_send_message(&udp, &test_peer, broadcast_hello, 26);
+	elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, 26, nullptr);
+	elix_networksocket_send_message(&udp, &test_peer, broadcast_hello, 26, nullptr);
 
 	while (true) {
 
@@ -356,7 +356,7 @@ int main(int argc, char *argv[]) {
 	uint8_t broadcast_hello_size = 26;
 
 	if ( local_interface ) {
-		broadcast_hello_size = snprintf((char*)broadcast_hello, 64, "\1%s at %d.%d.%d.%d", info.user, local_interface->ip.ip4.octel[0], local_interface->ip.ip4.octel[1], local_interface->ip.ip4.octel[2], local_interface->ip.ip4.octel[3] );
+		broadcast_hello_size = snprintf((char*)broadcast_hello, 64, "\1%s at %d.%d.%d.%d", info.system_user, local_interface->ip.ip4.octel[0], local_interface->ip.ip4.octel[1], local_interface->ip.ip4.octel[2], local_interface->ip.ip4.octel[3] );
 	}
 
 	elix_filetranfer_peer_list peers_list;
@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
 	elix_networksocket_create(&tcp, TCP, &any_peer, {true, true, false} );
 
 	LOG_PRINT("Broadcast Hello");
-	elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, broadcast_hello_size);
+	elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, broadcast_hello_size, nullptr);
 
 	int option_index = 0;
 
@@ -429,7 +429,7 @@ int main(int argc, char *argv[]) {
 			elix_window_notification_tick(notify_handler);
 			elix_filetransfer_listen(peers_list, udp);
 			elix_filetransfer_listen(peers_list, tcp);
-			elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, broadcast_hello_size);
+			elix_networksocket_send_message(&udp, &broadcast_peer, broadcast_hello, broadcast_hello_size, nullptr);
 
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 		}

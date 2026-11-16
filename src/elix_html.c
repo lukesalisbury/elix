@@ -51,8 +51,10 @@ static elix_html_string_match comment_end = { {'-','-', '>'}, {3}, PARSE_NONE };
 static elix_html_string_match cdata_start = { {'[','C','D','A','T','A','['}, {7}, PARSE_SCAN_CDATA };
 static elix_html_string_match cdata_end = { {']',']','>'}, {3}, PARSE_NONE };
 
-#define STATECHANGE(Q, D) Q;// printf("%*s]" #Q "\n", D, " ");
+static char elix_html_stupid_void_tags[] = "base" "\0" "br" "\0" "embed" "\0" "hr" "\0" "img" "\0" "input" "\0" "link" "\0" "meta" "\0" "area" "\0" "col" "\0" "track" "\0" "source" "\0" "wbr";
 
+#define STATECHANGE(Q, D) Q;
+//#define STATECHANGE(Q, D) Q; printf("%*s]" #Q "\n", D, " ");
 
 bool doesStringMatch(uint32_t c, elix_html_parse_next_info info, elix_html_string_match needle, elix_html_parse_state * results) {
 	if ( info.index >= needle.size) {
@@ -74,7 +76,7 @@ bool doesStringMatch(uint32_t c, elix_html_parse_next_info info, elix_html_strin
 }
 
 bool doesInsensitiveStringMatch(uint32_t c, elix_html_parse_next_info info, elix_html_string_match needle, elix_html_parse_state * results) {
-	return doesStringMatch(lowerCaseASCII(c), info, needle, results);
+	return doesStringMatch(elix_parse_lowerCaseASCII(c), info, needle, results);
 }
 
 
@@ -276,8 +278,8 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 
 	elix_character char32;
 
-    //Set up pointer to current character
-    doc->reference->iter = doc->reference->string.data + current.offset;
+	//Set up pointer to current character
+	doc->reference->iter = doc->reference->string.data + current.offset;
 
 	int d = 0;
 	size_t text_length = 0;
@@ -296,10 +298,10 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 				case PARSE_TAG: {
 					if (debug == 2)
 						printf("PARSE_TAG " pZU ": %d %c\n", current.offset, char32.value, char32.value);
-					if ( isVoidTagChar(char32.value) ) {
+					if ( elix_parse_isVoidTagChar(char32.value) ) {
 						/* / */ 
 						state = STATECHANGE(PARSE_END_TAG, d);
-					} else if ( isValidNameChar(char32.value, !buffer.length) ) {
+					} else if ( elix_parse_isValidNameChar(char32.value, !buffer.length) ) {
 						/* a-z, if not first 0-9 also */
 						state = STATECHANGE(PARSE_START_TAG, d);
 						elix_string_append( &buffer, char32.value);
@@ -322,7 +324,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 				case PARSE_START_TAG: {
 					if (debug == 2)
 						printf("PARSE_START_TAG " pZU ": %d %c\n", current.offset, char32.value, char32.value);
-					if ( isValidNameChar(char32.value, 0) ) {
+					if ( elix_parse_isValidNameChar(char32.value, 0) ) {
 						/* a-z or 0-9 */
 						state = STATECHANGE(PARSE_START_TAG, d);
 						elix_string_append( &buffer, char32.value);
@@ -449,7 +451,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 				case PARSE_END_TAG: {
 					if (debug == 2)
 						printf("PARSE_END_TAG " pZU ": %d %c\n", current.offset, char32.value, char32.value);
-					if ( isValidNameChar(char32.value, 0) ) {
+					if ( elix_parse_isValidNameChar(char32.value, 0) ) {
 						state = STATECHANGE(PARSE_END_TAG, d);
 						elix_string_append( &buffer, char32.value );
 					} else if ( char32.value == '>' ) {
@@ -460,8 +462,9 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 						current_node->textContent.length = buffer.length;
 
 						if (current_node->children.active.used == 1 ) {
-							if (((elix_html_node)current_node->children.active.values[0])->type == ELEMENT_RAWTEXT)
+							if (((elix_html_node)current_node->children.active.values[0])->type == ELEMENT_RAWTEXT) {
 								current_node->textContent = ((elix_html_node)current_node->children.active.values[0])->textContent;
+							}
 						}
 						current_node = current_node->parent;
 						
@@ -477,7 +480,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 				case PARSE_SCAN_TEXT: {
 					if (debug == 2)
 						printf("PARSE_SCAN_TEXT " pZU ": %d %c\n", current.offset, char32.value, char32.value);
-					if ( isOpenTagChar(char32.value) ) {
+					if ( elix_parse_isOpenTagChar(char32.value) ) {
 						if ( debug == 1 )
 							printf("[TEXT]\n");
 						current_node = elix_html_node_push_text(current_node, doc, &current, &text_length);
@@ -507,7 +510,7 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 							elix_string_clear(&buffer);
 						}
 						state = STATECHANGE(PARSE_NONE, d);
-					} else if ( isValidNameChar(char32.value, !buffer.length) ) {
+					} else if ( elix_parse_isValidNameChar(char32.value, !buffer.length) ) {
 						elix_string_append( &buffer, char32.value );
 					} else if ( char32.value == ' ' ) {
 						///NOTE:  
@@ -566,13 +569,13 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 						state = STATECHANGE(PARSE_ERROR, d);
 						LOG_MESSAGE("Error Parsing Attribute at char " pZD "\n%.*s\n%*c^\n", current.offset, current.offset < 4 ? 0 : (int)current.offset - 4, doc->reference->iter, current.offset < 4 ? (int)current.offset-1 : 3, '-' );
 						return current;
-					}							
+					}
 					break;
 				}
 				default: {
 					if (debug == 2)
 						printf("PARSE_NONE " pZU ": %d %c\n", current.offset, char32.value, char32.value);
-					if ( isOpenTagChar(char32.value) ) {
+					if ( elix_parse_isOpenTagChar(char32.value) ) {
 						state = STATECHANGE(PARSE_TAG, d);
 						elix_string_clear(&buffer);
 					} else {
@@ -587,22 +590,26 @@ elix_parse_status elix_html_parse(elix_html_document * doc, elix_parse_status * 
 		current.offset += char32.bytes;
 	} while (char32.value && current.offset < current.length );
 
+	if ( current_node != nullptr && doc->root) {
+		LOG_MESSAGE("Error Parsing Document. Ended with '%s' instead of '%s'", current_node->name, doc->root->name );
+	}
+
 	return current;
 }
 
 elix_html_document * elix_html_open( elix_string_buffer * content) {
-	elix_parse_status status = {};
+	elix_parse_status status = {0};
 	elix_html_document * doc = ALLOCATE(elix_html_document, 1);
 	doc->root = ALLOCATE(elix_html_node_object, 1);
 
 	size_t first_character = 0;
 
-	while ( first_character < content->string.length && isWhiteSpace(content->string.data[first_character]) ) {
-	    first_character++;
+	while ( first_character < content->string.length && elix_parse_isWhiteSpace(content->string.data[first_character]) ) {
+		first_character++;
 	}
 
-    if ( content->string.data[first_character] == '<' ) {
-        ///NOTE: Reference may be freed elsewhere
+	if ( content->string.data[first_character] == '<' ) {
+		///NOTE: Reference may be freed elsewhere
 		doc->reference = content;
 	} else {
 		LOG_ERROR("Error: HTML pages must start <");
@@ -614,19 +621,21 @@ elix_html_document * elix_html_open( elix_string_buffer * content) {
 elix_html_document * elix_html_new( elix_string_buffer * content) {
 	elix_parse_status status = {};
 	elix_html_document * doc = ALLOCATE(elix_html_document, 1);
+	LOG_INFO("%d %p", sizeof(elix_html_node_object), calloc(1, sizeof(elix_html_node_object)));
 	doc->root = ALLOCATE(elix_html_node_object, 1);
-    
+	
 	doc->reference = content;     ///NOTE: Reference may be freed elsewhere
 	return doc;
 }
 
 void elix_html_close(elix_html_document * doc) {
 	///TODO: Write this function, deleting each node & attr
-
 	LOG_ERROR("FUNCTION NOT WRITTEN YET");
-
+	if (doc) {
+		NULLIFY(doc->root);
+		
+	}
 }
-
 
 void elix_html_printNode(elix_html_node obj, size_t d) {
 	ASSERT(obj);
@@ -699,7 +708,6 @@ void elix_html_printNode(elix_html_node obj, size_t d) {
 
 }
 
-
 void elix_html_print(elix_html_document * doc) {
 	size_t d = 0;
 
@@ -721,4 +729,3 @@ void elix_html_print(elix_html_document * doc) {
 		printf("No Root Node found\n");
 	}
 }
-

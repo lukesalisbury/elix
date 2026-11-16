@@ -76,7 +76,7 @@ uint32_t elix_rendertreeitem_to_rgbabuffer(elix_rendertree_item * item, rbgabuff
 				//data is a elix_string_pointer
 
 				rbgabuffer_FillColor(ctx, item->render_style.colour.hex);
-				rbgabuffer_FillString(ctx, (elix_string_pointer*)item->data, item->render_style.x, item->render_style.y, item->render_style.width);
+				rbgabuffer_FillString(ctx, ((elix_string_pointer*)item->data), item->render_style.x, item->render_style.y, item->render_style.width);
 			}
 		
 			break;
@@ -129,5 +129,48 @@ uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_contex
 		LOG_ERROR("No Render Tree to render");
 	}
 
+	return 0;
+}
+
+uint32_t elix_rendertree_item_delete(elix_rendertree_item * item);
+
+uint32_t elix_rendertree_itemlist_delete(elix_rendertree_itemlist * list) {
+	for (uint8_t index = 0; index < list->active.used; index++) {
+		elix_rendertree_item_delete(list->active.values[index]);
+	}
+	if (list->next) {
+		elix_rendertree_itemlist_delete(list->next);
+	}
+	return 0;
+}
+
+
+uint32_t elix_rendertree_item_delete(elix_rendertree_item * item) {
+	ASSERT(item);
+
+	switch (item->data_type) {
+		case ERTD_STRING:
+			//elix_string_pointer
+			//NULLIFY(item->data);
+			break;
+		default:
+			NULLIFY(item->data);
+			break;
+	}
+
+	elix_rendertree_itemlist_delete(&item->children);
+	NULLIFY(item);
+	return 0;
+}
+
+
+uint32_t elix_rendertree_delete(elix_rendertree * tree) {
+	ASSERT(tree);
+
+	if (tree->root) {
+		elix_rendertree_item_delete(tree->root);
+		NULLIFY(tree->root);
+	}
+	NULLIFY(tree);
 	return 0;
 }

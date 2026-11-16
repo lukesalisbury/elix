@@ -10,24 +10,38 @@
 #include <stdlib.h>
 
 
-char * elix_program_directory__special_get(ELIX_PROGRAM_DIRECTORY dir_type, const char * folder_name, UNUSEDARG size_t extra_bytes) {
-	static const char * specials[ELIX_PROGRAM_DIRECTORY_LENGTH] = {
-		"XDG_DATA_DIRS", //EPDS_DOCS_PUBLIC
-		"XDG_DATA_DIRS", //EPDS_DOCS_PRIVATE
-		"XDG_DATA_HOME", //EPDS_USER_ROAMING
-		"XDG_CACHE_HOME" //EPDS_USER_LOCAL
+char * elix_program_directory__special_get(elix_program_special_directory dir_type, const char * folder_name, UNUSEDARG size_t extra_bytes) {
+	static const char * specials[ELIX_PROGRAM_SPECIAL_DIRECTORY_LENGTH] = {
+		nullptr, //EPSD_SYSTEM_CONFIG
+		"XDG_DATA_DIRS", //EPSD_SYSTEM_RESOURCE
+		"XDG_CONFIG_HOME", //EPSD_USER_CONFIG
+		"XDG_DATA_HOME", //EPSD_USER_RESOURCE
+		"XDG_DOCUMENTS_DIR", //EPSD_USER_DOCS
+		"XDG_CACHE_HOME", //EPSD_USER_CACHE
+		"XDG_RUNTIME_DIR", //EPSD_USER_TEMP
+		
 	};
-	static const char * failsafe_path[ELIX_PROGRAM_DIRECTORY_LENGTH] = {
-		"/usr/share",
-		"/usr/share",
-		"~/.local/share",
-		"~/.cache"
+	static const char * failsafe_path[ELIX_PROGRAM_SPECIAL_DIRECTORY_LENGTH] = {
+		"/etc/",
+		"/usr/share/",
+		"~/.config/",
+		"~/.local/share/",
+		"~/Documents/",
+		"~/.cache/",
+		"/tmp/",
 	};
-	ASSERT(dir_type < ELIX_PROGRAM_DIRECTORY_LENGTH);
+	ASSERT(dir_type < ELIX_PROGRAM_SPECIAL_DIRECTORY_LENGTH);
 
 	char * directory = ALLOCATE(char, ELIX_FILE_PATH_LENGTH);
-	char * env_path = getenv( specials[dir_type]); /* DON'T MODIFY */
+	/*const*/ char * env_path = nullptr; /* DON'T MODIFY */
 
+	if ( specials[dir_type] ) {
+		#ifdef secure_getenv
+		env_path = secure_getenv(specials[dir_type]); /* DON'T MODIFY */
+		#else
+		env_path = getenv(specials[dir_type]); /* DON'T MODIFY */
+		#endif
+	}
 	if ( env_path ) {
 		char buffer_directory[ELIX_FILE_PATH_LENGTH] = {0};
 		char ** dir_list = elix_cstring_split(env_path, ':', 0);
@@ -35,15 +49,18 @@ char * elix_program_directory__special_get(ELIX_PROGRAM_DIRECTORY dir_type, cons
 		if ( dir_list ) {
 			size_t in = 0;
 			while (dir_list[in]) {
-				for (size_t c = 0; c < ELIX_FILE_PATH_LENGTH;  c++ ) {
-					buffer_directory[c] = 0;
-				}
+				buffer_directory[0] = 0; //Reset String
+
 				elix_cstring_append(buffer_directory, ELIX_FILE_PATH_LENGTH, dir_list[in], elix_cstring_length(dir_list[in], 0));
 				elix_cstring_append(buffer_directory, ELIX_FILE_PATH_LENGTH, "/", 1);
-				elix_cstring_append(buffer_directory, ELIX_FILE_PATH_LENGTH, folder_name, elix_cstring_length(folder_name, 0));
+				if ( folder_name ) {
+					elix_cstring_append(buffer_directory, ELIX_FILE_PATH_LENGTH, folder_name, elix_cstring_length(folder_name, 0));
+					elix_cstring_append(buffer_directory, ELIX_FILE_PATH_LENGTH, "/", 1);
+				}
 
 				if ( elix_os_directory_is(buffer_directory, nullptr) ) {
 					elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, dir_list[in], elix_cstring_length(dir_list[in], 0));
+					elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
 					in = SIZE_MAX;
 				} else {
 					in++;
@@ -57,17 +74,21 @@ char * elix_program_directory__special_get(ELIX_PROGRAM_DIRECTORY dir_type, cons
 		}
 	} else {
 		if ( failsafe_path[dir_type][0] == '~' ) {
-			char * home_path = getenv("HOME");/* DON'T MODIFY */
+			/*const*/ char * home_path = getenv("HOME");/* DON'T MODIFY */
 			if ( home_path ) {
 				elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, home_path, elix_cstring_length(home_path, 0));
 				elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, failsafe_path[dir_type]+1, elix_cstring_length(failsafe_path[dir_type]+1, 0));
 			} else {
 				elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/tmp/", 5);
 			}
+
 		} else {
 			elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, failsafe_path[dir_type], elix_cstring_length(failsafe_path[dir_type], 0));
 		}
-
+		if ( folder_name ) {
+			elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, folder_name, elix_cstring_length(folder_name, 0));
+			elix_cstring_append(directory, ELIX_FILE_PATH_LENGTH, "/", 1);
+		}
 	}
 
 	return directory;

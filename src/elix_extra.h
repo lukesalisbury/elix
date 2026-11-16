@@ -36,7 +36,7 @@ typedef struct elix_http_request {
 	char * accept;
 	char * connection;
 	char * cookie;
-
+	char * authorization;
 } elix_http_request;
 
 typedef struct elix_http_response {

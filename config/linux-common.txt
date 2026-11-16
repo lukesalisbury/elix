@@ -4,7 +4,6 @@ m
 pthread
 wayland-client
 dbus-1
-SDL2
 [lib_flags]
 
 [includes]
@@ -19,4 +18,4 @@ _GNU_SOURCE=1
 -Wl,-rpath -Wl,\$$ORIGIN/lib
 [pkg-linux]
 dbus-1
-sdl3
+sdl2

@@ -134,7 +134,7 @@ typedef struct elix_databuffer {
 	#else
 		#define LOG_INFO(M, ...) 
 	#endif
-
+	#define LOG_PREPRINT(M, ...) printf( M, ##__VA_ARGS__)
 	#define LOG_PRINT(M, ...) printf( M "\n", ##__VA_ARGS__)
 	#define LOG_MESSAGE(M, ...) printf("%24s:%04d | " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 	#define LOGF_MESSAGE(M, ...) printf("%21s() | " M "\n", __func__, ##__VA_ARGS__)
@@ -149,6 +149,7 @@ typedef struct elix_databuffer {
 	#define LOGF_MESSAGE(M, ...)
 	#define LOGF_ERROR(M, ...)
 	#define LOG_PRINT(M, ...) 
+	#define LOG_PREPRINT(M, ...) 
 #endif // ELIX_SKIP_CORE_LOG
 
 

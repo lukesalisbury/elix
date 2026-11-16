@@ -37,13 +37,18 @@ enum elix_html_element_type {
 
 #define ELIX_HTML_LIST_POOL_SIZE 8
 
+typedef struct elix_html_node_object elix_html_node_object;
+typedef struct elix_html_node_object* elix_html_node;
+typedef struct elix_html_nodelist elix_html_nodelist;
+typedef struct elix_html_attrlist elix_html_attrlist;
+typedef struct elix_html_attr_object* elix_html_attr;
+struct elix_html_attr_object;
+
 typedef struct elix_html_listpool {
 	uint8_t used;
 	data_pointer values[8];
 } elix_html_listpool;
 
-typedef struct elix_html_nodelist elix_html_nodelist;
-typedef struct elix_html_attrlist elix_html_attrlist;
 
 typedef struct elix_html_nodelist {
 	elix_html_listpool active;
@@ -55,11 +60,9 @@ typedef struct elix_html_attrlist {
 	elix_html_attrlist * next;
 } elix_html_attrlist;
 
-struct elix_html_node_object;
-typedef struct elix_html_node_object* elix_html_node;
 
-struct elix_html_attr_object;
-typedef struct elix_html_attr_object* elix_html_attr;
+
+
 
 typedef struct elix_html_document {
 	elix_html_nodelist all_nodes;
@@ -73,7 +76,6 @@ typedef struct elix_html_attr_object {
 } elix_html_attr_object;
 
 typedef struct elix_html_node_object {
-	uint8_t type;
 	char name[16];
 	elix_string_pointer source;
 	elix_string_pointer textContent;
@@ -82,7 +84,7 @@ typedef struct elix_html_node_object {
 	elix_html_attrlist attribute;
 	elix_parse_listsize childrenCount;
 	elix_parse_listsize attributeCount;
-	
+	uint8_t type;
 } elix_html_node_object;
 
 #ifdef __cplusplus

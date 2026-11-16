@@ -1,5 +1,5 @@
-#include "./elix/elix_cstring.h"
-#include "./elix/elix_os.h"
+#include "../elix_cstring.h"
+#include "../elix_os.h"
 
 
 #define STB_TRUETYPE_IMPLEMENTATION  // force following include to generate implementation

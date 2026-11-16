@@ -90,6 +90,10 @@ extern "C" {
 
 uint32_t elix_rendertree_to_rgbabuffer(elix_rendertree * tree, rbgabuffer_context * ctx, uint8_t redraw_all);
 
+uint32_t elix_rendertree_item_delete(elix_rendertree_item * item);
+uint32_t elix_rendertree_itemlist_delete(elix_rendertree_itemlist * list);
+uint32_t elix_rendertree_delete(elix_rendertree * tree);
+
 #ifdef __cplusplus
 }
 #endif

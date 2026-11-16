@@ -5,3 +5,4 @@
 //#https_client
 #server_http
 //#pixel_edit
+#client_ftp

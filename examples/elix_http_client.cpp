@@ -65,8 +65,8 @@ int main(int argc, char *argv[]) {
 
 	uint8_t request[73] = "GET / HTTP/1.1\r\nHost: 192.168.16.1\r\nAccept: */*\r\nConnection: close\r\n\r\n";
 
-	if ( RESULTS_SUCCESS == elix_networksocket_send_message(&client_socket, &target_peer, request, 73) ) {
-		while ( RESULTS_SUCCESS == elix_networksocket_receive_message(&client_socket, &buffer, &target_peer, false) ) {
+	if ( RESULTS_SUCCESS == elix_networksocket_send_message(&client_socket, &target_peer, request, 73, nullptr) ) {
+		while ( RESULTS_SUCCESS == elix_networksocket_receive_message(&client_socket, &target_peer, buffer.data, buffer.data_size, nullptr, false) ) {
 			LOG_INFO("[Recieved] %s", buffer.data);
 
 			elix_string_append_data(&html_doc.string, buffer.data, buffer.actual_size);

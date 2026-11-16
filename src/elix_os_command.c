@@ -25,7 +25,7 @@
 #include <spawn.h>
 #endif
 
-void elix_os_command_capture_unsafe( const char * program_and_arguments, char * buffer, size_t buffer_size, UNUSEDARG char ** env) {
+size_t elix_os_command_capture_unsafe( const char * program_and_arguments, char * buffer, size_t buffer_size, UNUSEDARG char ** env) {
 	int err = 0;
 	size_t count = 0;
 	size_t str_size = 0;
@@ -35,7 +35,7 @@ void elix_os_command_capture_unsafe( const char * program_and_arguments, char * 
 
 	if ( str_size > 0x1FF ) {
 		LOG_INFO("Command length is to much: %s", program_and_arguments);
-		return;
+		return 0 ;
 	}
 
 	FILE * command_pipe = popen(program_and_arguments, "r");
@@ -44,8 +44,9 @@ void elix_os_command_capture_unsafe( const char * program_and_arguments, char * 
 	} else {
 		size_t q = fread(buffer, buffer_size, 1, command_pipe);
 		pclose(command_pipe);
+		return buffer_size;
 	}
-
+	return 0;
 }
 
 
@@ -104,8 +105,9 @@ void elix_os_command_capture( char * program, char * buffer, size_t buffer_size,
 
 }
 
-void elix_os_command( char * program, char ** env, ...) {
+int64_t elix_os_command( char * program, char ** env, ...) {
 //
+	int64_t q = 0;
 	int err = 0;
 	size_t count = 0;
 	size_t str_size = 0;
@@ -143,5 +145,5 @@ void elix_os_command( char * program, char ** env, ...) {
 	va_end(passed_arguments);
 
 	NULLIFY(arguments);
-
+	return q;
 }

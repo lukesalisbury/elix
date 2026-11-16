@@ -24,4 +24,4 @@ struct elix_os_window : elix_os_window_common {
 };
 
 
-#endif // ELIX_OSWINDOW_WAYLAND_HPP
+#endif // ELIX_OSWINDOW_SDL2_HPP

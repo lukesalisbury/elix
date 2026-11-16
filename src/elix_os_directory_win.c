@@ -56,6 +56,44 @@ bool elix_os_directory_remove(const char * path, UNUSEDARG bool forced, UNUSEDAR
 
 }
 
+ELIX_FILESYSTEM_ACCESS elix_os_path_status( const char * path ) {
+
+	struct stat64 directory;
+
+	int32_t err = _stat64( path, &directory );
+
+	if ( err == ENOENT ) {
+		//LOG_MESSAGE("Path was not found. %s", path);
+	} else if ( err == EINVAL  ) {
+		LOG_MESSAGE("Invalid parameter; . %s", path);
+	} else if ( 0 == err ) {
+		bool readable = (0 == _access(path, R_OK));
+		bool writable = (0 == _access(path, W_OK));
+
+		if ( S_ISDIR(directory.st_mode) ) {
+			if (readable) { 
+				return writable ? ESA_DIR_RW : ESA_DIR_R;
+			}
+			return ESA_DIR_EXISTS;
+		} else if ( S_ISBLK(directory.st_mode) ) {
+			return ESA_FILE_EXISTS;
+		} else if ( S_ISREG(directory.st_mode) ) {
+			if (readable) {
+				///TODO: Check if this works, otherwise check extension instead (elix_cstring_has_suffix(path, ".exe"))
+				if ( (_access(path, X_OK) == 0) ) {
+					return ESA_FILE_EXE;
+				}
+				return writable ? ESA_FILE_RW : ESA_FILE_R;
+			}
+			return ESA_FILE_EXISTS;
+		}
+
+	}
+	return ESA_INVALID;
+}
+
+
+
 uint8_t elix_os_directory_is( const char * path, UNUSEDARG elix_consent * consent){
 	//TODO Check consent
 
@@ -65,7 +103,7 @@ uint8_t elix_os_directory_is( const char * path, UNUSEDARG elix_consent * consen
 		clean_path = elix_cstring_substr(path,0, -1);
 		if ( clean_path ) {
 			suberr = elix_os_directory_is(clean_path, consent);
-			delete clean_path;
+			NULLIFY(clean_path);
 		}
 		return suberr;
 	}

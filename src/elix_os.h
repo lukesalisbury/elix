@@ -18,13 +18,6 @@
 #include "elix_core.h"
 #include "elix_consent.h"
 
-
-enum ELIX_DIRECTORY_ACCESS {
-	ELIX_DIR_FAILED,
-	ELIX_DIR_R,
-	ELIX_DIR_RW
-};
-
 enum ELIX_CHANGE_STATUS {
 	ELIX_CHANGE_FILE_UPDATE,
 	ELIX_CHANGE_FILE_ADDED,
@@ -35,17 +28,41 @@ enum ELIX_CHANGE_STATUS {
 	ELIX_CHANGE_UNKNOWN
 };
 
-typedef enum ELIX_PROGRAM_DIRECTORY {
-	EPDS_DOCS_PUBLIC,
-	EPDS_DOCS_PRIVATE,
-	EPDS_USER_ROAMING,
-	EPDS_USER_LOCAL,
-	ELIX_PROGRAM_DIRECTORY_LENGTH
-} ELIX_PROGRAM_DIRECTORY;
+typedef enum elix_program_special_directory {
+	EPSD_SYSTEM_CONFIG, // XDG_CONFIG_DIRS
+	EPSD_SYSTEM_RESOURCE, // XDG_DATA_DIRS or CSIDL_COMMON_DOCUMENTS or /usr/share/%program%/
+	EPSD_USER_CONFIG, // XDG_CONFIG_HOME or CSIDL_APPDATA
+	EPSD_USER_RESOURCE, // XDG_DATA_HOME or CSIDL_APPDATA
+	EPSD_USER_DOCS, // ~/Documents or CSIDL_PERSONAL
+	EPSD_USER_CACHE, // XDG_CACHE_HOME or CSIDL_LOCAL_APPDATA
+	EPSD_USER_TEMP, // XDG_RUNTIME_DIR
+	ELIX_PROGRAM_SPECIAL_DIRECTORY_LENGTH
+} elix_program_special_directory;
 
-struct elix_file_info {
+typedef enum elix_filesystem_access {
+	ESA_INVALID,
+	ESA_DIR_EXISTS,
+	ESA_DIR_R,
+	ESA_DIR_RW,
+	ESA_FILE_EXISTS,
+	ESA_FILE_R,
+	ESA_FILE_RW,
+	ESA_FILE_EXE,
+} elix_filesystem_access;
 
-};
+typedef enum elix_program_resource_directory {
+	EPRD_AUTO,
+	EPRD_GLOBAL_SHARE, 		// /usr/share/"program_name"/
+	EPRD_LOCAL_SHARE, 		// ~/.local/share/"program_name"/
+	EPRD_PARENT_SHARE, 	// ../share/"program_name"/ 
+	EPRD_SHARE,			// ./share/"program_name"/
+	EPRD_DATA,			// ./"program_name"_data/
+	//MUTATABLE options allow the program to be rename to have seperate resources
+	//No EPRD_GLOBAL_MUTATABLE or EPRD_LOCAL_SHARE as it would allow reading of other programs files
+	EPRD_PARENT_SHARE_MUTATABLE, 	// ../share/"executable"/
+	EPRD_SHARE_MUTATABLE, 			// ./share/"executable"/
+	EPRD_DATA_MUTATABLE, 			// ./"executable"_data/
+} elix_program_resource_directory;
 
 typedef struct elix_path {
 	char * uri;
@@ -59,36 +76,14 @@ typedef struct elix_directory {
 	elix_path * files;
 } elix_directory;
 
-/*
-struct elix_path_uri {
-	char * scheme = nullptr;
-	char * host = nullptr;
-	uint16_t port = 0;
-	char * path = nullptr;
-	char * filename = nullptr;
-	char * query = nullptr;
-	char * fragment = nullptr;
-	char * user = nullptr;
-	char * password = nullptr;
-};
-*/
-
-enum elix_program_resource_directory {
-	EPRD_AUTO,
-	EPRD_SHARE, // ./share/"executable"/
-	EPRD_PARENT_SHARE, // ../share/"executable"/ 
-	EPRD_DATA, // ./"executable"_data/
-	EPRD_GLOBAL, // /usr/share/"program_directory"/	
-};
-
 typedef struct elix_program_info {
-	char user[16];
-	char * program_name;
-	char * program_version;
-	char * program_version_level;
-	char * program_directory;
+	char system_user[16];
+	char program_name[32];
+	char program_version[8];
+	char program_version_directory[16];
+	char program_directory[40];
+	char program_executable[32];
 	elix_path path_executable;
-	uint32_t resource_directory_type;
 } elix_program_info;
 
 typedef struct elix_os_infomation {
@@ -106,12 +101,15 @@ extern "C" {
 
 // Path
 elix_path elix_path_create(const char * string);
-void elix_path_destroy(elix_path * directory);
+void elix_path_destroy(elix_path * path);
+
+elix_filesystem_access elix_os_path_status( const char * path );
 
 // Directory
 bool elix_os_directory_make(const char * path, uint32_t mode, bool parent, elix_consent * consent);
 bool elix_os_directory_remove(const char * path, bool forced, elix_consent * consent);
 uint8_t elix_os_directory_is(const char * path, elix_consent * consent);
+
 elix_directory * elix_os_directory_list_create(const char * path, const char * suffix, elix_consent * consent);
 void elix_os_directory_list_destroy(elix_directory ** directory);
 
@@ -140,7 +138,7 @@ elix_databuffer elix_os_font( const char * font_name );
 void elix_os_socket_create();
 void elix_os_socket_destroy();
 
-// Associations/Shortcuts/b
+// Associations/Shortcuts
 /*
 void elix_os_file_association_make();
 void elix_os_file_association_remove();
@@ -165,17 +163,15 @@ size_t elix_os_vprocessor_usage();
 
 void elix_os_system_idle(uint32_t time);
 
-
-
 //Program
-elix_program_info elix_program_info_create(const char * arg0, const char * program_name, const char * version, const char * version_level );
 
-char * elix_program_directory_documents(const elix_program_info * program_info, bool shared, const char * filename );
-char * elix_program_directory_user( const elix_program_info * program_info, bool roaming, const char * filename );
-char * elix_program_directory_resources(const elix_program_info * program_info, const char * filename, uint8_t override_lookup);
-char * elix_program_directory_cache_file( const elix_program_info * program_info, const char * filename);
+elix_program_info elix_program_info_create(const char * arg0, const char * program_name, const char * version_release, /*NULL*/ const char * version_directory);
+void elix_program_info_set_resource( elix_program_info * info, elix_program_resource_directory source);
 
-char * elix_program_directory_root( const elix_program_info * program_info, const char * filename);
+char * elix_program_directory_config( const elix_program_info * program_info, const char * filename, uint8_t always_return, uint8_t system_version );
+char * elix_program_directory_resource( const elix_program_info * program_info, const char * filename, uint8_t always_return, elix_program_resource_directory resource_directory );
+char * elix_program_directory_document( const elix_program_info * program_info, const char * filename, uint8_t always_return, uint8_t request_root_directory );
+char * elix_program_directory_cache( const elix_program_info * program_info, const char * filename, uint8_t always_return, uint8_t system_version );
 
 
 #ifdef __cplusplus
@@ -183,7 +179,7 @@ char * elix_program_directory_root( const elix_program_info * program_info, cons
 #endif
 
 inline bool elix_os_directory_make_stupid_c(const char * path) {
-	return elix_os_directory_make(path, 744, false, nullptr);
+	return elix_os_directory_make(path, 0755, false, nullptr);
 }
 inline bool elix_os_directory_remove_stupid_c(const char * path) {
 	return elix_os_directory_remove(path, false, nullptr);

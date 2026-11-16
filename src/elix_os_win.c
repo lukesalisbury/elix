@@ -18,11 +18,14 @@
 
 char * elix_program_directory__special_get(ELIX_PROGRAM_DIRECTORY dir_type, const char * folder_name, UNUSEDARG size_t extra_bytes) {
 	static int32_t specials[ELIX_PROGRAM_DIRECTORY_LENGTH] = {
-		CSIDL_COMMON_DOCUMENTS,
-		CSIDL_PERSONAL,
-		CSIDL_APPDATA,
-		CSIDL_LOCAL_APPDATA
+		CSIDL_APPDATA, //EPSD_SYSTEM_CONFIG
+		CSIDL_COMMON_DOCUMENTS,//EPSD_SYSTEM_RESOURCE
+		CSIDL_APPDATA,//EPSD_USER_CONFIG
+		CSIDL_PERSONAL,//EPSD_USER_DOCS
+		CSIDL_LOCAL_APPDATA, //EPSD_USER_CACHE
+		0XFFFFFFFF // SHGetSpecialFolderPath should not a value so just use c:\temp //EPSD_USER_TEMP
 	};
+
 	ASSERT(dir_type < ELIX_PROGRAM_DIRECTORY_LENGTH);
 
 	char * directory = new char[ELIX_FILE_PATH_LENGTH]();

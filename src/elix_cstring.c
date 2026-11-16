@@ -154,6 +154,8 @@ size_t elix_cstring_append( char * str, const size_t len, const char * text, con
 }
 
 
+
+/* Search for character not in the search string */
 size_t elix_cstring_find_not_of( const char * str, const char * search, size_t offset) {
 	size_t str_len = elix_cstring_length(str,0);
 	size_t srh_len = elix_cstring_length(search,0);
@@ -171,6 +173,7 @@ size_t elix_cstring_find_not_of( const char * str, const char * search, size_t o
 	return SIZE_MAX;
 }
 
+/* Search for the next string inside of the string */
 size_t elix_cstring_find_of(const char * str, const char * search, size_t offset) {
 	size_t length = elix_cstring_length(str,0);
 	size_t sl = elix_cstring_length(search,0);
@@ -189,6 +192,7 @@ size_t elix_cstring_find_of(const char * str, const char * search, size_t offset
 	return SIZE_MAX;
 }
 
+/* Search for the last string inside of the string */
 size_t elix_cstring_find_last_of(const char * str, const char * search, size_t offset) {
 	size_t length = elix_cstring_length(str, 0);
 	size_t sl = elix_cstring_length(search, 0);
@@ -208,44 +212,48 @@ size_t elix_cstring_find_last_of(const char * str, const char * search, size_t o
 	return SIZE_MAX;
 }
 
-size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const char *search, const char *replace) {
-	//NOTE: This is slow, and not a good implemenation
-	//TODO: Check for overflow
+size_t elix_cstring_inreplace( char * source_text, size_t buffer_size, const char *search, const char *replace, uint8_t repeat) {
+	///NOTE: This is slow, and not a good implemenation
+	///TODO: Check for overflow
 	size_t search_len = 0, replace_len = 0;
 	ssize_t diff_len = 0;
 	size_t source_len = elix_cstring_length(source_text, 1);
-	size_t pos = elix_cstring_find_of(source_text, search, 0);
-	if ( pos != SIZE_MAX ) {
-		search_len = elix_cstring_length(search, 0);
-		replace_len = elix_cstring_length(replace, 0);
-		diff_len = search_len - replace_len;
+	
+	do {
+		size_t pos = elix_cstring_find_of(source_text, search, 0);
+		if ( pos != SIZE_MAX ) {
+			search_len = elix_cstring_length(search, 0);
+			replace_len = elix_cstring_length(replace, 0);
+			diff_len = search_len - replace_len;
 
-		size_t l = 0;
-		if ( diff_len > 0 ) {
-			for (size_t i = pos; i < source_len; l++,i++) {
-				if ( l < replace_len ) {
+			size_t l = 0;
+			if ( diff_len > 0 ) {
+				for (size_t i = pos; i < source_len; l++,i++) {
+					if ( l < replace_len ) {
+						source_text[i] = replace[l];
+					} else {
+						source_text[i] = source_text[i+diff_len];
+					}
+				}
+			} else {
+				if ( pos+search_len >= buffer_size) {
+					return 0;
+				}
+				if ( diff_len < 0 ) {
+					size_t j = source_len-diff_len;
+					for (size_t i = source_len; i >= pos+search_len; i--) {
+						j = i-diff_len;
+						source_text[j] = source_text[i];
+					}
+				}
+				for (size_t i = pos; i < buffer_size && l < replace_len; l++,i++) {
 					source_text[i] = replace[l];
-				} else {
-					source_text[i] = source_text[i+diff_len];
 				}
 			}
 		} else {
-			if ( pos+search_len >= buffer_size) {
-				return 0;
-			}
-			if ( diff_len < 0 ) {
-				size_t j = source_len-diff_len;
-				for (size_t i = source_len; i >= pos+search_len; i--) {
-					j = i-diff_len;
-					source_text[j] = source_text[i];
-				}
-			}
-			for (size_t i = pos; i < buffer_size && l < replace_len; l++,i++) {
-				source_text[i] = replace[l];
-			}
+			repeat = 0;
 		}
-
-	}
+	} while (repeat);
 	return diff_len;
 }
 
@@ -467,3 +475,9 @@ void elix_cstring_transform( char * string, uint8_t mode ) {
 	}
 }
 
+size_t elix_cstring_build_path( char * str, const size_t len, const char * path, const char * name) {
+	size_t length = 0;
+	elix_cstring_copy(path, str, len);
+	elix_cstring_append(str, len, name, elix_cstring_length(name, 0));
+	return length;
+}

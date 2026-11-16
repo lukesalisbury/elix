@@ -9,14 +9,6 @@ elix_html_node elix_html_nodelist_get(elix_html_nodelist * nl, uint16_t index);
 uint8_t elix_html_build_rendertree_item(elix_rendertree * tree, elix_html_node obj, elix_rendertree_item * render_item) {
 	ASSERT(obj);
 
-
-	//ELEMENT_FOREIGN,
-	//ELEMENT_VOID,
-	//ELEMENT_TEMPLATE,
-	//ELEMENT_RAWTEXT,
-	//ELEMENT_RAWTEXTAREA,
-	//ELEMENT_NORMAL
-
 	switch (obj->type) {
 		case ELEMENT_RAWTEXT:
 			render_item->render_style.backgroundColour.hex = 0x000000FF;

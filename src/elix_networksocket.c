@@ -124,8 +124,10 @@ void elix_networksocket_create(elix_networksocket * networksocket, uint8_t type,
 		}
 	} else if ( networksocket->socket_type == UDP) {
 		networksocket->socket_handle = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-		if ( bind(networksocket->socket_handle, (struct sockaddr*)&address, sizeof (address)) < 0 ) {
-			LOG_ERROR( "IPPROTO_UDP Bind Error %s", strerror(errno) );
+		if ( option.listening ) {
+			if ( bind(networksocket->socket_handle, (struct sockaddr*)&address, sizeof (address)) < 0 ) {
+				LOG_ERROR( "IPPROTO_UDP Bind Error %s", strerror(errno) );
+			}
 		}
 
 	}
@@ -212,12 +214,14 @@ function_results elix_networksocket_response_message(elix_networksocket * networ
 		read = recv(networksocket->socket_handle, buffer->data, buffer->data_size, 0);
 		if ( read > 0 ) {
 			buffer->actual_size = read;
+	
+			
 			//LOG_INFO( "Socket Read: %d Bytes", read);
 		} else if ( read < 0 ) {
 			LOG_ERROR( "recv Error: %s", strerror(errno));
 		}
 	} else {
-		LOG_ERROR("For non TCP response, user elix_networksocket_receive_message");
+		LOG_ERROR("For non TCP response, user elix_networksocket_response_message");
 	}
 
 	if ( read > 0 ) {
@@ -226,12 +230,10 @@ function_results elix_networksocket_response_message(elix_networksocket * networ
 	return RESULTS_ERROR;
 }
 
-function_results elix_networksocket_receive_message2(elix_networksocket * networksocket, elix_network_peer * remote_peer, uint8_t * message, uint64_t message_size, uint64_t * byte_read ) {
-
+function_results elix_networksocket_receive_message(elix_networksocket * networksocket, elix_network_peer * remote_peer, uint8_t * message, uint64_t message_size, uint64_t * byte_read, bool ignore_local_broadcast ) {
 	int read = 0;
 	struct sockaddr_in remote;
 	socklen_t remote_size = sizeof(remote);
-
 
 	if ( networksocket->socket_type == TCP ) {
 		// Server mode, use peer socket handle otherwise
@@ -250,6 +252,13 @@ function_results elix_networksocket_receive_message2(elix_networksocket * networ
 	} else if ( networksocket->socket_type == UDP) {
 		read = recvfrom(networksocket->socket_handle, NATIVE_BUFFER_TYPE(message), message_size, 0, (struct sockaddr*)&remote, NATIVE_LENGTH_TYPE(&remote_size));
 		elix_network_ip_address_set(&remote, remote_peer);
+
+		// Ignore Local Broadcast
+		if ( ignore_local_broadcast ) {
+			if (elix_networksocket_from_local_address(networksocket, remote_peer) ) {
+				return RESULTS_ERROR_LOCAL_MESSAGE;
+			}
+		}
 	}
 
 
@@ -257,13 +266,18 @@ function_results elix_networksocket_receive_message2(elix_networksocket * networ
 		if ( byte_read ) {
 			*byte_read = read;
 		}
+		if ( read < message_size ) {
+			//Incase the response is a string, add an NULL;
+			message[read] = 0;
+		}
+
 		return RESULTS_SUCCESS;
 	}
 	return RESULTS_ERROR;
 }
 
 
-function_results elix_networksocket_receive_message(elix_networksocket * networksocket, elix_allocated_buffer * buffer, elix_network_peer * remote_peer, bool ignore_local_broadcast ) {
+function_results elix_networksocket_receive_message_old(elix_networksocket * networksocket, elix_allocated_buffer * buffer, elix_network_peer * remote_peer, bool ignore_local_broadcast ) {
 
 	int read = 0;
 	struct sockaddr_in remote;
@@ -307,8 +321,7 @@ function_results elix_networksocket_receive_message(elix_networksocket * network
 	return RESULTS_ERROR;
 }
 
-
-function_results elix_networksocket_send_message2(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size, uint64_t * byte_sent) {
+function_results elix_networksocket_send_message(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size, uint64_t * byte_sent) {
 	struct sockaddr_in address = elix_network_socket_address(target);
 
 	ssize_t results = 0;
@@ -336,7 +349,7 @@ function_results elix_networksocket_send_message2(elix_networksocket * networkso
 }
 
 
-function_results elix_networksocket_send_message(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size) {
+function_results elix_networksocket_send_message_old(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size) {
 	struct sockaddr_in address = elix_network_socket_address(target);
 
 	ssize_t results = 0;

@@ -22,6 +22,20 @@ elix_hashmap * elix_hashmap_create() {
 	elix_hashmap * hm = ALLOCATE(elix_hashmap, 1);
 	return hm;
 }
+/*
+void elix_hashmap_foreach(elix_hashmap * hm, void (*item_func)(uint32_t, data_pointer*)) {
+	for (size_t c = 0; c< hm->active.used; c++ ) {
+		//item_func(hm->active.key[c], hm->active.value[c]);
+		LOG_INFO("Key: %d '%s'", hm->active.keys[c], hm->active.values[c]); ///TODO: JUST FOR TESTING, REMOVE LATER
+	}
+	
+	if ( hm->next ) {
+		elix_hashmap_foreach(hm->next, item_func);
+	}
+
+}
+*/
+
 
 void elix_hashmap_insert_hash(elix_hashmap * hm, uint32_t key, data_pointer value) {
 	if ( hm->active.used < ELIX_HASHMAP_POOL_SIZE ) {

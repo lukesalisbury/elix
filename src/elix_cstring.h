@@ -75,35 +75,18 @@ uint32_t elix_cstring_peek_character(char * object);
 
 char ** elix_cstring_split( const char * source, char token, char string_bracket);
 
-#ifdef __cplusplus
-}
-#endif
 
-inline char * elix_cstring_new( const char * source ) {
+static inline char * elix_cstring_create( const char * source, size_t size ) {
+	return elix_cstring_from( nullptr, source, size );
+}
+
+static inline char * elix_cstring_new( const char * source ) {
 	return elix_cstring_from( nullptr, source, elix_cstring_length(source, 0) );
 }
 
-
-// Default parameters functions
-
-inline size_t elix_ucstring_length_stupid_c(const uint8_t * string) {
-	return elix_ucstring_length(string, 0);
+#ifdef __cplusplus
 }
-inline size_t elix_cstring_length_stupid_c(const char * string) {
-	return elix_cstring_length(string, 0);
-}
-inline size_t elix_cstring_find_not_of_stupid_c( const char * str, const char * search ) {
-	return elix_cstring_find_not_of( str, search, 0);
-}
-inline size_t elix_cstring_find_of_stupid_c( const char * str, const char * search ) {
-	return elix_cstring_find_of( str, search, 0);
-}
-inline char * elix_cstring_from_stupid_c( const char * source, const char * default_str) {
-	return elix_cstring_from( source, default_str, SIZE_MAX);
-}
-inline void elix_cstring_copy_stupid_c( const char * source_init, char * dest_init) {
-	elix_cstring_copy( source_init, dest_init, SIZE_MAX);
-}
+#endif
 
 
 #endif // ELIX_CSTRING_HPP

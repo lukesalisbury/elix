@@ -22,7 +22,7 @@ void elix_ucstring_copy( const unsigned char * source_init, char * dest_init, si
 	do {
 		*dest++ = *source++;
 		dest_size--;
-	} while( dest_size && *source != 0);
+	} while( dest_size > 1 && *source != 0);
 	*dest = '\0';
 }
 
@@ -85,18 +85,6 @@ elix_http_request elix_http_request_parse(elix_allocated_buffer * buffer, bool h
 	uint8_t headers_count = 0;
 	char * text_buffer = (char *)buffer->data;
 	
-	//if ( header_copy ) {
-	//	request.headers_buffer = (char *)calloc(header_size, 1);
-	//	elix_cstring_copy((char *)buffer.data, request.headers_buffer, header_size);
-	//	request.headers_buffer_size = header_size;
-	//	text_buffer = (char *)request.headers_buffer;
-	//}
-	//if ( body_copy ) {
-	//	request.body_buffer = (char *)calloc(buffer.actual_size - header_size, 1);
-	//	elix_cstring_copy((char *)buffer.data + header_size, request.body_buffer, buffer.actual_size - header_size);
-	//	request.body_buffer_size = buffer.actual_size - header_size;
-	//}
-
 	if ( header_size == SIZE_MAX ) {
 		LOG_ERROR("No headers found");
 		return request;

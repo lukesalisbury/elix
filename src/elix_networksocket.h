@@ -67,8 +67,8 @@ enum ELIX_NETWORK_PROTOCOL{UDP, TCP};
 
 typedef struct elix_allocated_buffer {
 	uint8_t data[ELIX_ALLOCATED_BUFFER_SIZE];
-	uint16_t data_size;
-	uint16_t actual_size;
+	uint64_t data_size;
+	uint64_t actual_size;
 } elix_allocated_buffer;
 
 typedef union elix_ip_address {
@@ -96,11 +96,10 @@ typedef struct elix_network_interface {
 } elix_network_interface;
 
 typedef struct elix_network_peer {
-	elix_socket_handle socket_handle; // Should be set to INVALID_SOCKET
+	elix_socket_handle socket_handle; // Should be set to INVALID_SOCKET/-1
 	elix_ip_address ip;
 	elix_ip_port port;
 } elix_network_peer;
-
 
 typedef struct elix_networksocket_options {
 	uint8_t listening;
@@ -158,8 +157,12 @@ void elix_networksocket_destroy(elix_networksocket * networksocket );
 
 bool elix_networksocket_from_local_address(elix_networksocket * networksocket, elix_network_peer * remote_peer );
 function_results elix_networksocket_listen_for_message(elix_networksocket * networksocket, elix_network_peer * remote_peer);
-function_results elix_networksocket_receive_message(elix_networksocket * networksocket, elix_allocated_buffer * buffer, elix_network_peer * remote_peer, bool ignore_local_broadcast );
-function_results elix_networksocket_send_message(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size);
+function_results elix_networksocket_receive_message(elix_networksocket * networksocket, elix_network_peer * remote_peer, uint8_t * message, uint64_t message_size, uint64_t * byte_read, bool ignore_local_broadcast  );
+function_results elix_networksocket_send_message(elix_networksocket * networksocket, elix_network_peer * target_peer, const uint8_t * message, uint64_t message_size, uint64_t * byte_sent);
+
+
+//function_results elix_networksocket_receive_message_old(elix_networksocket * networksocket, elix_allocated_buffer * buffer, elix_network_peer * remote_peer, bool ignore_local_broadcast );
+//function_results elix_networksocket_send_message_old(elix_networksocket * networksocket, elix_network_peer * target, const uint8_t * message, uint64_t message_size);
 void elix_networktsocket_close_peer(elix_network_peer * peer);
 
 
